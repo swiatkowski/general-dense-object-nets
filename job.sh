@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-#SBATCH --job-name=test_job_swiatkowski
+#SBATCH --job-name=train_gdon
 #SBATCH --partition=common
 #SBATCH --qos=8gpu3d
 #SBATCH --gres=gpu:1
