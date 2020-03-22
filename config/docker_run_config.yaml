@@ -17,3 +17,7 @@ iiwa-2:
 wei:
   wei:
     path_to_data_directory: '/home/wei/data'
+
+jakub-ThinkPad-T480:
+  jakub:
+    path_to_data_directory: '/home/jakub/data'
