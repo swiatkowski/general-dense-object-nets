@@ -292,6 +292,7 @@ class DenseCorrespondenceTraining(object):
             for i, data in enumerate(self._data_loader, 0):
                 loss_current_iteration += 1
                 start_iter = time.time()
+                print('Current iter: ', loss_current_iteration)
 
                 match_type, \
                 img_a, img_b, \
@@ -413,9 +414,14 @@ class DenseCorrespondenceTraining(object):
                 update_plots(loss, match_loss, masked_non_match_loss, background_non_match_loss, blind_non_match_loss)
 
                 if loss_current_iteration % save_rate == 0:
-                    self.save_network(dcn, optimizer, loss_current_iteration, logging_dict=self._logging_dict)
+                    print("Saving model at iter: ", loss_current_iteration)
+                    self.save_network(dcn, optimizer,
+                                      loss_current_iteration,
+                                      logging_dict=self._logging_dict,
+                                      last_only=True)
 
                 if loss_current_iteration % logging_rate == 0:
+                    print("Logging at iter: ", loss_current_iteration)
                     logging.info("Training on iteration %d of %d" %(loss_current_iteration, max_num_iterations))
 
                     logging.info("single iteration took %.3f seconds" %(elapsed))
@@ -471,7 +477,11 @@ class DenseCorrespondenceTraining(object):
 
         self._logging_dir_name = dir_name
 
-        self._logging_dir = os.path.join(utils.convert_data_relative_path_to_absolute_path(self._config['training']['logging_dir']), dir_name)
+        # TODO(swiatkowski): Ideally, we would like to save _not_ to "results", where the limit is 5GB.
+        self._logging_dir = os.path.join(
+            utils.convert_data_relative_path_to_absolute_path(self._config['training']['logging_dir'], results=True),
+            dir_name
+        )
 
         print "logging_dir:", self._logging_dir
 
@@ -498,21 +508,27 @@ class DenseCorrespondenceTraining(object):
         """
         return self._logging_dir
 
-    def save_network(self, dcn, optimizer, iteration, logging_dict=None):
+    def save_network(self, dcn, optimizer, iteration, logging_dict=None, last_only=False):
         """
         Saves network parameters to logging directory
         :return:
         :rtype: None
         """
 
-        network_param_file = os.path.join(self._logging_dir, utils.getPaddedString(iteration, width=6) + ".pth")
+        if last_only:
+            padded_str = '999999'
+        else:
+            padded_str = utils.getPaddedString(iteration, width=6)
+
+        network_param_file = os.path.join(self._logging_dir, padded_str + ".pth")
         optimizer_param_file = network_param_file + ".opt"
+        print('Saving to params to file: ', network_param_file)
         torch.save(dcn.state_dict(), network_param_file)
         torch.save(optimizer.state_dict(), optimizer_param_file)
 
         # also save loss history stuff
         if logging_dict is not None:
-            log_history_file = os.path.join(self._logging_dir, utils.getPaddedString(iteration, width=6) + "_log_history.yaml")
+            log_history_file = os.path.join(self._logging_dir, padded_str + "_log_history.yaml")
             utils.saveToYaml(logging_dict, log_history_file)
 
             current_loss_file = os.path.join(self._logging_dir, 'loss.yaml')

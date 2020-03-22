@@ -158,7 +158,7 @@ def convert_to_absolute_path(path):
     home_dir = os.path.expanduser("~")
     return os.path.join(home_dir, path)
 
-def convert_data_relative_path_to_absolute_path(path, assert_path_exists=False):
+def convert_data_relative_path_to_absolute_path(path, assert_path_exists=False, results=False):
     """
     Expands a path that is relative to the DC_DATA_DIR
     returned by `get_data_dir()`.
@@ -173,8 +173,10 @@ def convert_data_relative_path_to_absolute_path(path, assert_path_exists=False):
 
     if os.path.isabs(path):
         return path
-
-    full_path = os.path.join(get_data_dir(), path)
+    if results:
+        full_path = os.path.join(getDenseCorrespondenceSourceDir(), path)
+    else:
+        full_path = os.path.join(get_data_dir(), path)
 
     if assert_path_exists:
         if not os.path.exists(full_path):
