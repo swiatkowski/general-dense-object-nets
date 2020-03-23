@@ -1,3 +1,59 @@
+## Training Dense Object Nets on the Entropy cluster
+
+Configure the virtualenv e.g. `mkvirtualenv gdon` and `pip install -r requirements.txt`.
+
+The data is already available on the Entropy server under `/scidatasm/dense_object_nets`.
+Alternatively, you can download new data as below:
+```
+python config/download_pdc_data.py config/dense_correspondence/dataset/composite/caterpillar_upright.yaml <full_path_to_data_location>
+```
+
+Build the docker image on your local machine:
+    ```
+    cd pytorch-dense-correspondence
+    git submodule update --init --recursive
+    cd docker
+    ./docker_build.py
+    ```
+
+Sing up for Docker Hub: https://hub.docker.com/signup.
+This will be needed to download docker images on the Entropy cluster.
+Login `docker login` on your machine using the created credentials
+
+Login into the Entropy cluster `<user_name>@entropy.mimuw.edu.pl`.
+
+Download the docker image using Singularity: 
+```singularity pull `/results/$USER/gdon_latest.sif` docker://<hub-user>/<repo-name>```
+Comment: Pulling creates a .sif file, which compresses all docker layers to a single SIF file.
+This is a heavy file (~4GB). However, we also want to access the SIF file on worker nodes. 
+Therefore, we need to save the SIF file to a directory that is synced with the worker nodes.
+These are `/results` (5GB limit for students) and `/scidatasm` (sync every 10min).
+Fow now, the scripts expect the SIF file under `/results/$USER/gdon_latest.sif`.
+
+Upload the code to the Entropy cluster under `/results/$USER/`.
+We store the code under `/results` dir because the code also needs to be available for the worked nodes.  
+Comment: An convenient way is to develop on your local machine (IDE, git access etc.) 
+and deploy code changes to the Entropy server.
+When using PyCharm, it is very convenient to configure automatic deployment of your changes to the Entropy server.
+You can do this under `Tools -> Deployment -> Configureation`. 
+Select `SFTP` and `OpenSSH config and authentication agent`.
+
+Now you are ready to submit your job using
+`bash run_batch.sh` from the code directory.
+You can see the status of your jobs using `squeue` and the logs under
+`/results/$USER/train_gdon_log.txt`.
+
+You can access the Jupyter and Tensorboard running on the Entropy cluster by setting the tunnel e.g.:
+```ssh -N -L 8888:localhost:8888 <user>@entropy.mimuw.edu.pl```
+
+TODO(swiatkowski): TensorBoard files are exported. Add commands to access Tensorboard over SSH tunnel.
+
+For additional information refer to the document with the project description:
+https://docs.google.com/document/d/1Cq5LK8KdpZXHa9k9BCUp3NHovZnRnwo60e0jzbM_y18/edit?usp=sharing
+
+
+
+## Original README
 ### Updates 
 
 - September 4, 2018: Tutorial and data now available!  [We have a tutorial now available here](./doc/tutorial_getting_started.md), which walks through step-by-step of getting this repo running.
