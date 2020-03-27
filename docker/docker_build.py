@@ -13,6 +13,7 @@ if __name__=="__main__":
 
 
 	parser = argparse.ArgumentParser()
+	parser.add_argument("-u", "--user_name", type=str, help="username inside docker image", default=user_name)
 	parser.add_argument("-i", "--image", type=str,
 		help="name for the newly created docker image", default=default_image_name)
 
@@ -32,7 +33,7 @@ if __name__=="__main__":
 			--build-arg USER_PASSWORD=%(password)s \
 			--build-arg USER_ID=%(user_id)s \
 			--build-arg USER_GID=%(group_id)s" \
-			%{'user_name': user_name, 'password': args.password, 'user_id': args.user_id, 'group_id': args.group_id}
+			%{'user_name': args.user_name, 'password': args.password, 'user_id': args.user_id, 'group_id': args.group_id}
 
 	if args.passthrough:
 		cmd += " " + args.passthrough

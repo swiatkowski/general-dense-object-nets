@@ -1,2 +1,2 @@
 #!/bin/bash
-sbatch job.sh --output /results/$USER/train_gdon_log.txt
+sbatch --output /results/$USER/train_gdon_log.txt job.sh

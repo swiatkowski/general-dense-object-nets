@@ -34,7 +34,7 @@ if __name__=="__main__":
     dense_correspondence_source_dir = os.path.join(home_directory, 'code')
 
     cmd = "xhost +local:root \n"
-    cmd += "nvidia-docker run "
+    cmd += "docker run "
     if args.container:
         cmd += " --name %(container_name)s " % {'container_name': args.container}
 

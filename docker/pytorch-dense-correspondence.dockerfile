@@ -6,14 +6,15 @@ ARG USER_ID
 ARG USER_GID
 
 RUN apt-get update
-RUN apt install sudo
+RUN apt-get install sudo
 RUN useradd -ms /bin/bash $USER_NAME
 RUN usermod -aG sudo $USER_NAME
 RUN yes $USER_PASSWORD | passwd $USER_NAME
 
 # set uid and gid to match those outside the container
-RUN usermod -u $USER_ID $USER_NAME 
-RUN groupmod -g $USER_GID $USER_NAME
+RUN usermod -u $USER_ID $USER_NAME
+# Causes build issues on Mac
+#RUN groupmod -g $USER_GID $USER_NAME
 
 WORKDIR /home/$USER_NAME
 ENV USER_HOME_DIR=/home/$USER_NAME
