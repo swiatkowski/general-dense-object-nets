@@ -39,6 +39,7 @@ from dense_correspondence.dataset.spartan_dataset_masked import SpartanDataset, 
 from dense_correspondence.network.dense_correspondence_network import DenseCorrespondenceNetwork
 
 from dense_correspondence.loss_functions.pixelwise_contrastive_loss import PixelwiseContrastiveLoss
+from dense_correspondence.loss_functions.ap_loss import PixelAPLoss, RingSampler
 import dense_correspondence.loss_functions.loss_composer as loss_composer
 from dense_correspondence.evaluation.evaluation import DenseCorrespondenceEvaluation
 
@@ -89,7 +90,7 @@ class DenseCorrespondenceTraining(object):
         if self._dataset is None:
             self._dataset = SpartanDataset.make_default_10_scenes_drill()
 
-        
+
         self._dataset.load_all_pose_data()
         self._dataset.set_parameters_from_training_config(self._config)
 
@@ -101,7 +102,7 @@ class DenseCorrespondenceTraining(object):
             if self._dataset_test is None:
                 self._dataset_test = SpartanDataset(mode="test", config=self._dataset.config)
 
-            
+
             self._dataset_test.load_all_pose_data()
             self._dataset_test.set_parameters_from_training_config(self._config)
 
@@ -258,9 +259,18 @@ class DenseCorrespondenceTraining(object):
         optimizer = self._optimizer
         batch_size = self._data_loader.batch_size
 
-        pixelwise_contrastive_loss = PixelwiseContrastiveLoss(image_shape=dcn.image_shape, config=self._config['loss_function'])
-        pixelwise_contrastive_loss.debug = True
+        loss_function = None
+        if self._config['loss_function']['name'] == 'pixelwise_contrastive_loss':
+            pixelwise_contrastive_loss = PixelwiseContrastiveLoss(image_shape=dcn.image_shape, config=self._config['loss_function'])
+            pixelwise_contrastive_loss.debug = True
+            loss_function = pixelwise_contrastive_loss
+        elif self._config['loss_function']['name'] == 'aploss':
+            sampler = RingSampler(inner_radius=10, outter_radius=12)
+            loss_function = PixelAPLoss(nq=25, sampler=sampler) # nq hyperparam todo
+        else:
+            raise ValueError("Couldn't find your loss_function: " + self._config['loss_function']['name'])
 
+        loss_function.cuda()
         loss = match_loss = non_match_loss = 0
 
         max_num_iterations = self._config['training']['num_iterations'] + start_iteration
@@ -271,7 +281,7 @@ class DenseCorrespondenceTraining(object):
         # logging
         self._logging_dict = dict()
         self._logging_dict['train'] = {"iteration": [], "loss": [], "match_loss": [],
-                                           "masked_non_match_loss": [], 
+                                           "masked_non_match_loss": [],
                                            "background_non_match_loss": [],
                                            "blind_non_match_loss": [],
                                            "learning_rate": [],
@@ -288,8 +298,10 @@ class DenseCorrespondenceTraining(object):
         # TPV = TrainingProgressVisualizer()
 
         for epoch in range(50):  # loop over the dataset multiple times
-
+            print "Epoch {}/50".format(epoch)
             for i, data in enumerate(self._data_loader, 0):
+                if (i % 100 == 0):
+                    print "Iteration {}/{}".format(i, len(self._data_loader))
                 loss_current_iteration += 1
                 start_iter = time.time()
                 print('Current iter: ', loss_current_iteration)
@@ -308,7 +320,7 @@ class DenseCorrespondenceTraining(object):
 
 
                 data_type = metadata["type"][0]
-                
+
                 img_a = Variable(img_a.cuda(), requires_grad=False)
                 img_b = Variable(img_b.cuda(), requires_grad=False)
 
@@ -334,14 +346,17 @@ class DenseCorrespondenceTraining(object):
                 image_b_pred = dcn.process_network_output(image_b_pred, batch_size)
 
                 # get loss
-                loss, match_loss, masked_non_match_loss, \
-                background_non_match_loss, blind_non_match_loss = loss_composer.get_loss(pixelwise_contrastive_loss, match_type,
+                loss, match_loss, masked_non_match_loss, background_non_match_loss, blind_non_match_loss = 0, 0, 0, 0, 0
+                if self._config['loss_function']['name'] == 'pixelwise_contrastive_loss':
+                    loss, match_loss, masked_non_match_loss, \
+                    background_non_match_loss, blind_non_match_loss = loss_composer.get_loss(pixelwise_contrastive_loss, match_type,
                                                                                 image_a_pred, image_b_pred,
                                                                                 matches_a,     matches_b,
                                                                                 masked_non_matches_a, masked_non_matches_b,
                                                                                 background_non_matches_a, background_non_matches_b,
                                                                                 blind_non_matches_a, blind_non_matches_b)
-                
+                elif self._config['loss_function']['name'] == 'aploss':
+                    loss = loss_function(image_a_pred, image_b_pred, matches_a, matches_b)
 
                 loss.backward()
                 optimizer.step()
@@ -401,7 +416,7 @@ class DenseCorrespondenceTraining(object):
 
                     elif data_type == SpartanDatasetDataType.MULTI_OBJECT:
                         self._tensorboard_logger.log_value("train loss MULTI_OBJECT", loss.item(), loss_current_iteration)
-                    
+
                     elif data_type == SpartanDatasetDataType.SYNTHETIC_MULTI_OBJECT:
                         self._tensorboard_logger.log_value("train loss SYNTHETIC_MULTI_OBJECT", loss.item(), loss_current_iteration)
                     else:
@@ -614,4 +629,3 @@ class DenseCorrespondenceTraining(object):
     def make_default():
         dataset = SpartanDataset.make_default_caterpillar()
         return DenseCorrespondenceTraining(dataset=dataset)
-
