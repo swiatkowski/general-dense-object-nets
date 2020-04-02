@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-
+# this class is taken from https://github.com/naver/r2d2/blob/master/nets/ap_loss.py
 class APLoss (nn.Module):
     """ differentiable AP loss, through quantization.
 
@@ -55,7 +55,7 @@ class APLoss (nn.Module):
         assert x.shape == label.shape # N x M
         return self.compute_AP(x, label)
 
-
+# this class is inspired by PixelAPLoss from https://github.com/naver/r2d2/blob/master/nets/ap_loss.py
 class PixelAPLoss(nn.Module):
     """
     Computes the pixel-wise AP loss
@@ -114,6 +114,7 @@ class PixelAPLoss(nn.Module):
         return ap_loss.mean()
 
 
+# this class is inspired by Ngh2Sampler from https://github.com/naver/r2d2/blob/master/nets/sampler.py
 class RingSampler(nn.Module):
     """
     Class for sampling non-correspondence.
