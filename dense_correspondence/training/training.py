@@ -267,10 +267,10 @@ class DenseCorrespondenceTraining(object):
         elif self._config['loss_function']['name'] == 'aploss':
             sampler = RingSampler(inner_radius=10, outter_radius=12)
             loss_function = PixelAPLoss(nq=25, sampler=sampler) # nq hyperparam todo
+            loss_function.cuda()
         else:
             raise ValueError("Couldn't find your loss_function: " + self._config['loss_function']['name'])
 
-        loss_function.cuda()
         loss = match_loss = non_match_loss = 0
 
         max_num_iterations = self._config['training']['num_iterations'] + start_iteration
