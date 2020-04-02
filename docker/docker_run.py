@@ -11,8 +11,7 @@ if __name__=="__main__":
     user_name = getpass.getuser()
     default_image_name = user_name + '-pytorch-dense-correspondence'
     parser = argparse.ArgumentParser()
-    parser.add_argument("-i", "--image", type=str,
-        help="(required) name of the image that this container is derived from", default=default_image_name)
+    parser.add_argument("-i", "--image", type=str, help="(required) name of the image that this container is derived from", default=default_image_name)
 
     parser.add_argument("-c", "--container", type=str, default="pytorch-container", help="(optional) name of the container")\
 
@@ -23,35 +22,45 @@ if __name__=="__main__":
     parser.add_argument("-p", "--passthrough", type=str, default="", help="(optional) extra string that will be tacked onto the docker run command, allows you to pass extra options. Make sure to put this in quotes and leave a space before the first character")
 
     args = parser.parse_args()
-    print("running docker container derived from image %s" %args.image)
-    source_dir=os.path.join(os.getcwd(),"../")
+    print(f"running docker container derived from image {args.image}")
+    source_dir = os.path.join(os.getcwd(), "../")
     config_file = os.path.join(source_dir, 'config', 'docker_run_config.yaml')
 
     print(source_dir)
 
     image_name = args.image
-    home_directory = '/home/' + user_name
+    home_directory = f'/home/{user_name}'
     dense_correspondence_source_dir = os.path.join(home_directory, 'code')
 
     cmd = "xhost +local:root \n"
-    cmd += "docker run "
+    cmd += "docker run --gpus 1"
     if args.container:
-        cmd += " --name %(container_name)s " % {'container_name': args.container}
+        cmd += f" --name {args.container} "
 
-    cmd += " -e DISPLAY -e QT_X11_NO_MITSHM=1 -v /tmp/.X11-unix:/tmp/.X11-unix:rw "     # enable graphics 
-    cmd += " -v %(source_dir)s:%(home_directory)s/code "  \
-        % {'source_dir': source_dir, 'home_directory': home_directory}              # mount source
-    cmd += " -v ~/.ssh:%(home_directory)s/.ssh " % {'home_directory': home_directory}   # mount ssh keys
-    cmd += " -v /media:/media " #mount media
-    cmd += " -v ~/.torch:%(home_directory)s/.torch " % {'home_directory': home_directory}  # mount torch folder 
-                                                        # where pytorch standard models (i.e. resnet34) are stored
+    # enable graphics
+    cmd += " -e DISPLAY -e QT_X11_NO_MITSHM=1 -v /tmp/.X11-unix:/tmp/.X11-unix:rw "
 
-    cmd += " --user %s " % user_name                                                    # login as current user
+    # mount source
+    cmd += f" -v {source_dir}:{home_directory}/code "
+
+    # mount ssh keys
+    cmd += f" -v ~/.ssh:{home_directory}/.ssh "
+
+    # mount media
+    cmd += " -v /media:/media "
+
+    # mount torch folder (where pytorch standard models (i.e. resnet34) are stored)
+    cmd += f" -v ~/.torch:{home_directory}/.torch "
+
+    # login as current user
+    cmd += f" --user {user_name} "
 
     # uncomment below to mount your data volume
-    config_yaml = yaml.load(file(config_file))
+    config_yaml = yaml.load(open(config_file))
     host_name = socket.gethostname()
-    cmd += " -v %s:%s/data " %(config_yaml[host_name][user_name]['path_to_data_directory'], home_directory)
+
+    data_directory = config_yaml[host_name][user_name]['path_to_data_directory']
+    cmd += f" -v {data_directory}:{home_directory}/data "
 
     # expose UDP ports
     cmd += " -p 8888:8888 "
@@ -67,10 +76,8 @@ if __name__=="__main__":
     cmd += " --rm " # remove the image when you exit
 
 
-
-
     if args.entrypoint and args.entrypoint != "":
-        cmd += "--entrypoint=\"%(entrypoint)s\" " % {"entrypoint": args.entrypoint}
+        cmd += f'--entrypoint="{args.entrypoint}" '
     else:
         cmd += "-it "
     cmd += args.image
