@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 class Logger(object):
+=======
+class Logger:
+>>>>>>> Add abstract and concrete logging integration
     def __init__(self):
         self.storage = []
 
