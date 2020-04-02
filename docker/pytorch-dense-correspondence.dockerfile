@@ -29,6 +29,9 @@ RUN yes "Y" | /tmp/install_pytorch.sh
 COPY ./install_more.sh /tmp/install_more.sh
 RUN yes "Y" | /tmp/install_more.sh
 
+COPY ./install_additional_packages_gdon.sh /tmp/install_additional_packages_gdon.sh
+RUN yes "Y" | /tmp/install_additional_packages_gdon.sh
+
 # install director
 COPY ./install_director.sh /tmp/install_director.sh
 RUN cd $WORKDIR && yes "Y" | /tmp/install_director.sh
@@ -93,5 +96,4 @@ ENV NVIDIA_DRIVER_CAPABILITIES \
 RUN cd ${USER_HOME_DIR} && echo $(pwd) && chown $USER_NAME:$USER_NAME -R .
 
 
-ENTRYPOINT bash -c "source ~/code/docker/entrypoint.sh && /bin/bash"
-
+ENTRYPOINT bash -c "source ~/code/docker/entrypoint.sh && source ~/code/config/.env && /bin/bash"
