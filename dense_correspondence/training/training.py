@@ -15,11 +15,7 @@ from torchvision import transforms
 from torch.autograd import Variable
 import torch.nn as nn
 import torch.optim as optim
-
-
 import tensorboard_logger
-
-
 
 
 # dense correspondence
@@ -42,6 +38,8 @@ from dense_correspondence.loss_functions.pixelwise_contrastive_loss import Pixel
 from dense_correspondence.loss_functions.ap_loss import PixelAPLoss, RingSampler
 import dense_correspondence.loss_functions.loss_composer as loss_composer
 from dense_correspondence.evaluation.evaluation import DenseCorrespondenceEvaluation
+from dense_correspondence.evaluation.plotting import normalize_descriptor
+from dense_correspondence.logging.dispatcher import dispatch_logger
 
 
 class DenseCorrespondenceTraining(object):
@@ -56,6 +54,7 @@ class DenseCorrespondenceTraining(object):
 
         self._dcn = None
         self._optimizer = None
+        self.logger = dispatch_logger(self._config)
 
     def setup(self):
         """
@@ -232,7 +231,6 @@ class DenseCorrespondenceTraining(object):
         :return:
         :rtype:
         """
-
         start_iteration = copy.copy(loss_current_iteration)
 
         DCE = DenseCorrespondenceEvaluation
@@ -299,12 +297,14 @@ class DenseCorrespondenceTraining(object):
 
         for epoch in range(50):  # loop over the dataset multiple times
             print "Epoch {}/50".format(epoch)
+            # if epoch > 1: break
             for i, data in enumerate(self._data_loader, 0):
-                if (i % 100 == 0):
-                    print "Iteration {}/{}".format(i, len(self._data_loader))
+                # if i > 5: break
                 loss_current_iteration += 1
+                self.logger.log('epoch', epoch)
+                self.logger.log('iteration', loss_current_iteration)
+
                 start_iter = time.time()
-                print('Current iter: ', loss_current_iteration)
 
                 match_type, \
                 img_a, img_b, \
@@ -317,7 +317,6 @@ class DenseCorrespondenceTraining(object):
                 if (match_type == -1).all():
                     print "\n empty data, continuing \n"
                     continue
-
 
                 data_type = metadata["type"][0]
 
@@ -339,11 +338,12 @@ class DenseCorrespondenceTraining(object):
                 self.adjust_learning_rate(optimizer, loss_current_iteration)
 
                 # run both images through the network
-                image_a_pred = dcn.forward(img_a)
-                image_a_pred = dcn.process_network_output(image_a_pred, batch_size)
+                image_a_pred_ = dcn.forward(img_a)
+                image_a_pred = dcn.process_network_output(image_a_pred_, batch_size)
 
-                image_b_pred = dcn.forward(img_b)
-                image_b_pred = dcn.process_network_output(image_b_pred, batch_size)
+                image_b_pred_ = dcn.forward(img_b)
+                image_b_pred = dcn.process_network_output(image_b_pred_, batch_size)
+
 
                 # get loss
                 loss, match_loss, masked_non_match_loss, background_non_match_loss, blind_non_match_loss = 0, 0, 0, 0, 0
@@ -355,8 +355,15 @@ class DenseCorrespondenceTraining(object):
                                                                                 masked_non_matches_a, masked_non_matches_b,
                                                                                 background_non_matches_a, background_non_matches_b,
                                                                                 blind_non_matches_a, blind_non_matches_b)
+                    self.logger.log('loss', loss.item())
+                    self.logger.log('match_loss', match_loss.item())
+                    self.logger.log('masked_non_match_loss', masked_non_match_loss.item())
+                    self.logger.log('background_non_match_loss', background_non_match_loss.item())
+                    self.logger.log('blind_non_match_loss', blind_non_match_loss.item())
+
                 elif self._config['loss_function']['name'] == 'aploss':
                     loss = loss_function(image_a_pred, image_b_pred, matches_a, matches_b)
+                    self.logger.log('loss', loss.item())
 
                 loss.backward()
                 optimizer.step()
@@ -365,6 +372,7 @@ class DenseCorrespondenceTraining(object):
                 # TPV.update(self._dataset, dcn, loss_current_iteration, now_training_object_id=metadata["object_id"])
 
                 elapsed = time.time() - start_iter
+                self.logger.log('elapsed', elapsed)
 
                 def update_plots(loss, match_loss, masked_non_match_loss, background_non_match_loss, blind_non_match_loss):
                     """
@@ -373,12 +381,9 @@ class DenseCorrespondenceTraining(object):
                     :rtype:
                     """
 
-
-
                     learning_rate = DenseCorrespondenceTraining.get_learning_rate(optimizer)
                     self._logging_dict['train']['learning_rate'].append(learning_rate)
                     self._tensorboard_logger.log_value("learning rate", learning_rate, loss_current_iteration)
-
 
                     # Don't update any plots if the entry corresponding to that term
                     # is a zero loss
@@ -430,10 +435,18 @@ class DenseCorrespondenceTraining(object):
 
                 if loss_current_iteration % save_rate == 0:
                     print("Saving model at iter: ", loss_current_iteration)
-                    self.save_network(dcn, optimizer,
-                                      loss_current_iteration,
-                                      logging_dict=self._logging_dict,
-                                      last_only=True)
+                    self.save_network(dcn, optimizer, loss_current_iteration, logging_dict=self._logging_dict, last_only=True)
+
+                # proof of concept hacky image logging
+                if loss_current_iteration % 100 == 0:
+                    print '#' * 80
+                    image_1_path = os.path.join(utils.get_data_dir(), 'logs_proto/{}/processed/images/{}_rgb.png'.format(metadata['scene_name'][0], utils.getPaddedString(metadata['image_a_idx'].item(), width=6)))
+                    self.logger.log(loss_current_iteration, image_1_path, 'image')
+                    image_2_path = os.path.join(utils.get_data_dir(), 'logs_proto/{}/processed/images/{}_rgb.png'.format(metadata['scene_name'][0], utils.getPaddedString(metadata['image_b_idx'].item(), width=6)))
+                    self.logger.log(loss_current_iteration, image_2_path, 'image')
+
+                    self.log_prediction(image_a_pred_[0], loss_current_iteration)
+                    self.log_prediction(image_b_pred_[0], loss_current_iteration)
 
                 if loss_current_iteration % logging_rate == 0:
                     print("Logging at iter: ", loss_current_iteration)
@@ -471,11 +484,19 @@ class DenseCorrespondenceTraining(object):
                     gc_elapsed = time.time() - gc_start
                     logging.debug("garbage collection took %.2d seconds" %(gc_elapsed))
 
+
+                self.logger.send_logs()
+
                 if loss_current_iteration > max_num_iterations:
                     logging.info("Finished testing after %d iterations" % (max_num_iterations))
                     self.save_network(dcn, optimizer, loss_current_iteration, logging_dict=self._logging_dict)
+                    self.logger.exit()
                     return
 
+
+    def log_prediction(self, descriptor, iter):
+        normalized_descriptor = normalize_descriptor(descriptor.detach().cpu().numpy().transpose(1,2,0)) * 255
+        self.logger.log(iter, normalized_descriptor, 'image')
 
     def setup_logging_dir(self):
         """

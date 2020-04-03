@@ -2,5 +2,6 @@
 
 set -euxo pipefail
 
-# pytorch 1.1, CUDA 10
 pip install neptune-client
+pip install psutil
+pip install neptune-notebooks
