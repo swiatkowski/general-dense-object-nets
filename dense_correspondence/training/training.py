@@ -296,10 +296,7 @@ class DenseCorrespondenceTraining(object):
         # TPV = TrainingProgressVisualizer()
 
         for epoch in range(50):  # loop over the dataset multiple times
-            print "Epoch {}/50".format(epoch)
-            # if epoch > 1: break
             for i, data in enumerate(self._data_loader, 0):
-                # if i > 5: break
                 loss_current_iteration += 1
                 self.logger.log('epoch', epoch)
                 self.logger.log('iteration', loss_current_iteration)
@@ -439,7 +436,6 @@ class DenseCorrespondenceTraining(object):
 
                 # proof of concept hacky image logging
                 if loss_current_iteration % 100 == 0:
-                    print '#' * 80
                     image_1_path = os.path.join(utils.get_data_dir(), 'logs_proto/{}/processed/images/{}_rgb.png'.format(metadata['scene_name'][0], utils.getPaddedString(metadata['image_a_idx'].item(), width=6)))
                     self.logger.log(loss_current_iteration, image_1_path, 'image')
                     image_2_path = os.path.join(utils.get_data_dir(), 'logs_proto/{}/processed/images/{}_rgb.png'.format(metadata['scene_name'][0], utils.getPaddedString(metadata['image_b_idx'].item(), width=6)))
