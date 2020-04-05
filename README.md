@@ -33,8 +33,8 @@ These are `/results` (5GB limit for students) and `/scidatasm` (sync every 10min
 Fow now, the scripts expect the SIF file under `/results/$USER/gdon_latest.sif`.
 
 Upload the code to the Entropy cluster under `/results/$USER/`.
-We store the code under `/results` dir because the code also needs to be available for the worked nodes.
-Comment: An convenient way is to develop on your local machine (IDE, git access etc.)
+We store the code under `/results` dir because the code also needs to be available for the worker nodes.
+Comment: A convenient way is to develop on your local machine (with IDE and git access etc.)
 and deploy code changes to the Entropy server.
 When using PyCharm, it is very convenient to configure automatic deployment of your changes to the Entropy server.
 You can do this under `Tools -> Deployment -> Configureation`.
