@@ -20,30 +20,45 @@ Sing up for Docker Hub: https://hub.docker.com/signup.
 This will be needed to download docker images on the Entropy cluster.
 Login `docker login` on your machine using the created credentials
 
-Then tag and push your docker to dockerhub.
+Then tag and push your docker to Docker Hub:
+```
+docker tag <docker-id-eg-f69d0749ca1e> <hub-user>/<repo-name>:<tag>
+docker push <hub-user>/<repo-name>:<tag>
+```
 
 Login into the Entropy cluster `<user_name>@entropy.mimuw.edu.pl`.
 
 Download the docker image using Singularity:
-```singularity pull `/results/$USER/gdon_latest.sif` docker://<hub-user>/<repo-name>```
+```singularity pull /results/$USER/gdon_latest.sif docker://<hub-user>/<repo-name>```    
 Comment: Pulling creates a .sif file, which compresses all docker layers to a single SIF file.
 This is a heavy file (~4GB). However, we also want to access the SIF file on worker nodes.
 Therefore, we need to save the SIF file to a directory that is synced with the worker nodes.
 These are `/results` (5GB limit for students) and `/scidatasm` (sync every 10min).
 Fow now, the scripts expect the SIF file under `/results/$USER/gdon_latest.sif`.
 
-Upload the code to the Entropy cluster under `/results/$USER/`.
-We store the code under `/results` dir because the code also needs to be available for the worked nodes.
-Comment: An convenient way is to develop on your local machine (IDE, git access etc.)
-and deploy code changes to the Entropy server.
+Upload the code to the Entropy cluster under `/results/$USER/`. 
+You can do this by setting up SSH Agent Forwarding and cloning this repository from 
+GitHub, see [this](https://developer.github.com/v3/guides/using-ssh-agent-forwarding/) for more information.   
+We store the code under `/results` dir because the code also needs to be available for the worker nodes.
+Comment: A convenient way is to develop on your local machine (with IDE and git access etc.)
+and deploy small incremental changes to the Entropy server.
 When using PyCharm, it is very convenient to configure automatic deployment of your changes to the Entropy server.
 You can do this under `Tools -> Deployment -> Configureation`.
-Select `SFTP` and `OpenSSH config and authentication agent`.
+Select `SFTP` and `OpenSSH config and authentication agent`. 
+
+After cloning the repo to the server run on the server:
+```bash
+cd general-dense-object-nets
+git submodule update --init --recursive
+```
+
+You then need to add the `.env` file in config with the Neptun setup. See the Logging section below. 
 
 Now you are ready to submit your job using
 `bash run_batch.sh` from the code directory.
 You can see the status of your jobs using `squeue` and the logs under
-`/results/$USER/train_gdon_log.txt`.
+`/results/$USER/train_gdon_log.txt`. 
+Alternatively, you can run an interactive job using the `run.sh` script.
 
 You can access the Jupyter and Tensorboard running on the Entropy cluster by setting the tunnel e.g.:
 ```bash
