@@ -9,13 +9,13 @@ class NeptuneLogger(Logger):
         self.api = neptune
 
         logging_config = config['logging']
-        username = logging_config['username']
+        namespace = logging_config['namespace']
         project = logging_config['project']
         experiment = logging_config['experiment']
         description = logging_config['description']
         tags = logging_config['tags']
 
-        self.api.init('{}/{}'.format(username, project))
+        self.api.init('{}/{}'.format(namespace, project))
         self.api.create_experiment(name=experiment, description=description, tags=tags, params=config)
 
     def send_logs(self):
