@@ -1,9 +1,5 @@
 from dense_correspondence.logging.NeptuneLogger import NeptuneLogger
 
-<<<<<<< HEAD
-
-=======
->>>>>>> Add abstract and concrete logging integration
 def dispatch_logger(config):
     if config['logging']['backend'] == 'neptune':
         return NeptuneLogger(config)

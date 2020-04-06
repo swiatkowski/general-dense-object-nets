@@ -22,7 +22,7 @@ class DenseCorrespondenceNetwork(nn.Module):
 
     IMAGE_TO_TENSOR = valid_transform = transforms.Compose([transforms.ToTensor(), ])
 
-    def __init__(self, fcn, descriptor_dimension, image_width=640, image_height=480, normalize=True):
+    def __init__(self, fcn, descriptor_dimension, image_width=640, image_height=480, normalize=False):
         """
         :param fcn:
         :type fcn:
