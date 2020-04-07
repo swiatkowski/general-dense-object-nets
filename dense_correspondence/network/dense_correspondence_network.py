@@ -22,10 +22,8 @@ class DenseCorrespondenceNetwork(nn.Module):
 
     IMAGE_TO_TENSOR = valid_transform = transforms.Compose([transforms.ToTensor(), ])
 
-    def __init__(self, fcn, descriptor_dimension, image_width=640,
-                 image_height=480, normalize=False):
+    def __init__(self, fcn, descriptor_dimension, image_width=640, image_height=480, normalize=False):
         """
-
         :param fcn:
         :type fcn:
         :param descriptor_dimension:
@@ -369,17 +367,17 @@ class DenseCorrespondenceNetwork(nn.Module):
         :param config: Dict with dcn configuration parameters
 
         """
-        
+
         if config["backbone"]["model_class"] == "Resnet":
             resnet_model = config["backbone"]["resnet_name"]
             fcn = getattr(resnet_dilated, resnet_model)(num_classes=config['descriptor_dimension'])
-        
+
         elif config["backbone"]["model_class"] == "Unet":
             fcn = DenseCorrespondenceNetwork.get_unet(config)
 
         else:
             raise ValueError("Can't build backbone network.  I don't know this backbone model class!")
-        
+
         return fcn
 
     @staticmethod
@@ -405,7 +403,7 @@ class DenseCorrespondenceNetwork(nn.Module):
         :rtype:
         """
 
-        if "backbone" not in config:  
+        if "backbone" not in config:
             # default to CoRL 2018 backbone!
             config["backbone"] = dict()
             config["backbone"]["model_class"] = "Resnet"
@@ -577,4 +575,3 @@ class DenseCorrespondenceNetwork(nn.Module):
         # cast to float32, need this in order to use cv2.BFMatcher() with bf.knnMatch
         des = np.array(des, dtype=np.float32)
         return des
-

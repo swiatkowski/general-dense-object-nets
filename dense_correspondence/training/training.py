@@ -263,8 +263,11 @@ class DenseCorrespondenceTraining(object):
             pixelwise_contrastive_loss.debug = True
             loss_function = pixelwise_contrastive_loss
         elif self._config['loss_function']['name'] == 'aploss':
-            sampler = RingSampler(inner_radius=10, outter_radius=12)
-            loss_function = PixelAPLoss(nq=25, sampler=sampler) # nq hyperparam todo
+            inner_radius = self._config['loss_function']['inner_radius']
+            outter_radius =self._config['loss_function']['outter_radius']
+            num_samples =self._config['loss_function']['num_negative_samples']
+            sampler = RingSampler(inner_radius, outter_radius)
+            loss_function = PixelAPLoss(nq=25, sampler=sampler, num_negative_samples=num_samples) # nq hyperparam todo
             loss_function.cuda()
         else:
             raise ValueError("Couldn't find your loss_function: " + self._config['loss_function']['name'])
@@ -292,16 +295,14 @@ class DenseCorrespondenceTraining(object):
         if not use_pretrained:
             self.save_network(dcn, optimizer, 0)
 
-        # from training_progress_visualizer import TrainingProgressVisualizer
-        # TPV = TrainingProgressVisualizer()
-
+        total_time = time.time()
         for epoch in range(50):  # loop over the dataset multiple times
             for i, data in enumerate(self._data_loader, 0):
                 loss_current_iteration += 1
                 self.logger.log('epoch', epoch)
                 self.logger.log('iteration', loss_current_iteration)
 
-                start_iter = time.time()
+                iteration_time = time.time()
 
                 match_type, \
                 img_a, img_b, \
@@ -333,6 +334,7 @@ class DenseCorrespondenceTraining(object):
 
                 optimizer.zero_grad()
                 self.adjust_learning_rate(optimizer, loss_current_iteration)
+                self.logger.log('learning rate', self.get_learning_rate(optimizer))
 
                 # run both images through the network
                 image_a_pred_ = dcn.forward(img_a)
@@ -365,11 +367,9 @@ class DenseCorrespondenceTraining(object):
                 loss.backward()
                 optimizer.step()
 
-                #if i % 10 == 0:
-                # TPV.update(self._dataset, dcn, loss_current_iteration, now_training_object_id=metadata["object_id"])
-
-                elapsed = time.time() - start_iter
-                self.logger.log('elapsed', elapsed)
+                elapsed = time.time() - iteration_time
+                self.logger.log('elapsed', time.time() - iteration_time)
+                self.logger.log('total time', time.time() - total_time)
 
                 def update_plots(loss, match_loss, masked_non_match_loss, background_non_match_loss, blind_non_match_loss):
                     """
@@ -434,24 +434,12 @@ class DenseCorrespondenceTraining(object):
                     print("Saving model at iter: ", loss_current_iteration)
                     self.save_network(dcn, optimizer, loss_current_iteration, logging_dict=self._logging_dict, last_only=True)
 
-                # proof of concept hacky image logging
-                if loss_current_iteration % 100 == 0:
-                    image_1_path = os.path.join(utils.get_data_dir(), 'logs_proto/{}/processed/images/{}_rgb.png'.format(metadata['scene_name'][0], utils.getPaddedString(metadata['image_a_idx'].item(), width=6)))
-                    self.logger.log(loss_current_iteration, image_1_path, 'image')
-                    image_2_path = os.path.join(utils.get_data_dir(), 'logs_proto/{}/processed/images/{}_rgb.png'.format(metadata['scene_name'][0], utils.getPaddedString(metadata['image_b_idx'].item(), width=6)))
-                    self.logger.log(loss_current_iteration, image_2_path, 'image')
-
-                    self.log_prediction(image_a_pred_[0], loss_current_iteration)
-                    self.log_prediction(image_b_pred_[0], loss_current_iteration)
-
-                if loss_current_iteration % logging_rate == 0:
-                    print("Logging at iter: ", loss_current_iteration)
-                    logging.info("Training on iteration %d of %d" %(loss_current_iteration, max_num_iterations))
-
-                    logging.info("single iteration took %.3f seconds" %(elapsed))
-
-                    percent_complete = loss_current_iteration * 100.0/(max_num_iterations - start_iteration)
-                    logging.info("Training is %d percent complete\n" %(percent_complete))
+                if i % self._config["logging"]["qualitative_evaluation_logging_rate"] == 0:
+                    evaluations = DCE.evaluate_network_qualitative_without_plotting(dcn, dataset=self.dataset, randomize=True)
+                    for e, _ in evaluations['train_evals']:
+                        self.logger.log('Train eval - iter {}'.format(i), e * 255.0, 'image')
+                    for e, _ in evaluations['test_evals']:
+                        self.logger.log('Test eval - iter {}'.format(i), e * 255.0, 'image')
 
 
                 # don't compute the test loss on the first few times through the loop
@@ -464,8 +452,7 @@ class DenseCorrespondenceTraining(object):
                     gc.collect()
 
                     dcn.eval()
-                    test_loss, test_match_loss, test_non_match_loss = DCE.compute_loss_on_dataset(dcn,
-                                                                                                  self._data_loader_test, self._config['loss_function'], num_iterations=self._config['training']['test_loss_num_iterations'])
+                    test_loss, test_match_loss, test_non_match_loss = DCE.compute_loss_on_dataset(dcn, self._data_loader_test, self._config['loss_function'], num_iterations=self._config['training']['test_loss_num_iterations'])
 
                     # delete these variables so we can free GPU memory
                     del test_loss, test_match_loss, test_non_match_loss

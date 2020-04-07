@@ -1,6 +1,5 @@
 from dense_correspondence.logging.NeptuneLogger import NeptuneLogger
 
-
 def dispatch_logger(config):
     if config['logging']['backend'] == 'neptune':
         return NeptuneLogger(config)

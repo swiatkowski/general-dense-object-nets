@@ -60,10 +60,11 @@ class PixelAPLoss(nn.Module):
     """
     Computes the pixel-wise AP loss
     """
-    def __init__(self, nq=20, sampler=None):
+    def __init__(self, nq=20, sampler=None, num_negative_samples=80):
         nn.Module.__init__(self)
         self.aploss = APLoss(nq, min=0, max=1)
         self.sampler = sampler
+        self.num_negative_samples = num_negative_samples
 
     def compute_scores(self, descriptors1, descriptors2, indices_1, indices_2):
         selected_descriptors_1 = descriptors1[:, indices_1, :]
@@ -92,7 +93,7 @@ class PixelAPLoss(nn.Module):
         return offsetted_points.clamp(0, 480 * 640 - 1)
 
     def forward(self, descriptors1, descriptors2, matches_1, matches_2):
-        non_matches_2 = self.get_indieces_from_points_and_offsets(matches_2, self.sampler.negative_offsets)
+        non_matches_2 = self.get_indieces_from_points_and_offsets(matches_2, self.sampler.get_samples(self.num_negative_samples))
         matches_1 = matches_1.unsqueeze(-1)
         matches_2 = matches_2.unsqueeze(-1)
 
@@ -138,3 +139,12 @@ class RingSampler(nn.Module):
                     neg.append(i * image_width + j)
 
         self.register_buffer('negative_offsets', torch.LongTensor(neg))
+
+    def get_samples(self, num_samples=None):
+        if num_samples is None:
+            return self.negative_offsets
+        if num_samples < 0:
+            raise Exception('Number of samples must be positive')
+        num_offsets = len(self.negative_offsets)
+        indices = torch.randperm(num_offsets)[:num_samples]
+        return self.negative_offsets[indices]
