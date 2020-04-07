@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-
+from collections import namedtuple
 import os
 import dense_correspondence_manipulation.utils.utils as utils
 import logging
@@ -32,6 +32,16 @@ import dense_correspondence.evaluation.plotting as dc_plotting
 from dense_correspondence.correspondence_tools.correspondence_finder import random_sample_from_masked_image
 
 from dense_correspondence.evaluation.utils import PandaDataFrameWrapper
+
+DescriptorColormaps = namedtuple('DescriptorColormaps', [
+    'descriptor1',
+    'descriptor2',
+    'normalized_descriptor1',
+    'normalized_descriptor2',
+    'masked_normalized_descriptor1',
+    'masked_normalized_descriptor2'
+])
+ImagePairQualitativeResult = namedtuple('ImagePairQualitativeResult', ['correspondence', 'descriptor_colormaps'])
 
 # why don't we have scene_name
 class DCNEvaluationPandaTemplate(PandaDataFrameWrapper):
@@ -558,14 +568,8 @@ class DenseCorrespondenceEvaluation(object):
             masked_normalized_descriptor1 = res_a_norm * mask_a_repeat
             masked_normalized_descriptor2 = res_b_norm * mask_b_repeat
 
-        return {
-            'descriptor1': res_a,
-            'descriptor2': res_b,
-            'normalized_descriptor1': res_a_norm,
-            'normalized_descriptor2': res_b_norm,
-            'masked_normalized_descriptor1': masked_normalized_descriptor1 if plot_masked else None,
-            'masked_normalized_descriptor2': masked_normalized_descriptor2 if plot_masked else None,
-        }
+        return DescriptorColormaps(res_a, res_b, res_a_norm, res_b_norm, masked_normalized_descriptor1 if plot_masked else None, masked_normalized_descriptor2 if plot_masked else None)
+
 
     @staticmethod
     def clip_pixel_to_image_size_and_round(uv, image_width, image_height):
@@ -1375,20 +1379,19 @@ class DenseCorrespondenceEvaluation(object):
 
         gray_a_numpy = cv2.cvtColor(np.asarray(rgb_a), cv2.COLOR_BGR2GRAY)
         gray_b_numpy = cv2.cvtColor(np.asarray(rgb_b), cv2.COLOR_BGR2GRAY)
-        img3 = cv2.drawMatches(gray_a_numpy, kp1, gray_b_numpy, kp2, matches, flags=2, outImg=gray_b_numpy)
+        correspondence_image_pair = cv2.drawMatches(gray_a_numpy, kp1, gray_b_numpy, kp2, matches, flags=2, outImg=gray_b_numpy)
 
-        evaluation_result = {'correspondence': img3}
 
         # show colormap if possible (i.e. if descriptor dimension is 1 or 3)
+        decriptors_images = None
         if dcn.descriptor_dimension in [1,3]:
             decriptors_images = DenseCorrespondenceEvaluation.plot_descriptor_colormaps(res_a, res_b,
                                                                     descriptor_image_stats=descriptor_image_stats,
                                                                     mask_a=mask_a,
                                                                     mask_b=mask_b,
                                                                     plot_masked=True)
-            evaluation_result.update(decriptors_images)
 
-        return evaluation_result
+        return ImagePairQualitativeResult(correspondence_image_pair, decriptors_images)
 
 
     @staticmethod
@@ -2085,16 +2088,16 @@ class DenseCorrespondenceEvaluation(object):
             2 masked descriptors
         """
         data, comment = evaluation
-        correspondence = data['correspondence']
-        normalized_descriptor1 = data['normalized_descriptor1']
-        normalized_descriptor2 = data['normalized_descriptor2']
-        masked_normalized_descriptor1 = data['masked_normalized_descriptor1']
-        masked_normalized_descriptor2 = data['masked_normalized_descriptor2']
+        correspondence = data.correspondence
+        nd1 = data.descriptor_colormaps.normalized_descriptor1
+        nd2 = data.descriptor_colormaps.normalized_descriptor2
+        mnd1 = data.descriptor_colormaps.masked_normalized_descriptor1
+        mnd2 = data.descriptor_colormaps.masked_normalized_descriptor2
 
-        combined = np.concatenate((normalized_descriptor1, normalized_descriptor2), axis=1)
-        if masked_normalized_descriptor1 is not None:
-            masked_normalized_descriptors = np.concatenate((masked_normalized_descriptor1, masked_normalized_descriptor2), axis=1)
-            combined = np.concatenate((combined, masked_normalized_descriptors), axis=0)
+        combined = np.concatenate((nd1, nd2), axis=1)
+        if mnd1 is not None:
+            combined_masked_descriptors = np.concatenate((mnd1, mnd2), axis=1)
+            combined = np.concatenate((combined, combined_masked_descriptors), axis=0)
 
         return (np.concatenate((correspondence / 255.0, combined), axis=0), comment)
 
