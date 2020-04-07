@@ -42,6 +42,7 @@ from dense_correspondence.loss_functions.pixelwise_contrastive_loss import Pixel
 import dense_correspondence.loss_functions.loss_composer as loss_composer
 from dense_correspondence.evaluation.evaluation import DenseCorrespondenceEvaluation
 
+from dense_correspondence.loss_functions.probabilistic_loss import ProbabilisticLoss
 
 class DenseCorrespondenceTraining(object):
 
@@ -261,6 +262,8 @@ class DenseCorrespondenceTraining(object):
         pixelwise_contrastive_loss = PixelwiseContrastiveLoss(image_shape=dcn.image_shape, config=self._config['loss_function'])
         pixelwise_contrastive_loss.debug = True
 
+        probabilistic_loss = ProbabilisticLoss(image_shape=dcn.image_shape, config=self._config['loss_function'])
+
         loss = match_loss = non_match_loss = 0
 
         max_num_iterations = self._config['training']['num_iterations'] + start_iteration
@@ -327,21 +330,32 @@ class DenseCorrespondenceTraining(object):
                 self.adjust_learning_rate(optimizer, loss_current_iteration)
 
                 # run both images through the network
-                image_a_pred = dcn.forward(img_a)
-                image_a_pred = dcn.process_network_output(image_a_pred, batch_size)
+                image_a_pred, reliability_a = dcn.forward(img_a)
+                image_a_pred, reliability_a = dcn.process_network_output(image_a_pred, reliability_a, batch_size)
 
-                image_b_pred = dcn.forward(img_b)
-                image_b_pred = dcn.process_network_output(image_b_pred, batch_size)
+                image_b_pred, reliability_b = dcn.forward(img_b)
+                image_b_pred, reliability_b = dcn.process_network_output(image_b_pred, reliability_b, batch_size)
+
+                # print("image_a_pred", image_a_pred.shape, image_a_pred.sum(dim=[0,1,2]))
+                # print("reliability_a", reliability_a.shape, reliability_a.sum(dim=[0, 1]))
 
                 # get loss
-                loss, match_loss, masked_non_match_loss, \
-                background_non_match_loss, blind_non_match_loss = loss_composer.get_loss(pixelwise_contrastive_loss, match_type,
-                                                                                image_a_pred, image_b_pred,
-                                                                                matches_a,     matches_b,
-                                                                                masked_non_matches_a, masked_non_matches_b,
-                                                                                background_non_matches_a, background_non_matches_b,
-                                                                                blind_non_matches_a, blind_non_matches_b)
-                
+                if "name" in self._config["loss_function"] and self._config["loss_function"]["name"] == "probabilistic_loss":
+                    loss = probabilistic_loss.get_loss(match_type,
+                                                image_a_pred, image_b_pred,
+                                                reliability_a, reliability_b,
+                                                matches_a, matches_b,
+                                                masked_non_matches_a, masked_non_matches_b,
+                                                background_non_matches_a, background_non_matches_b,
+                                                blind_non_matches_a, blind_non_matches_b)
+                else:
+                    loss, match_loss, masked_non_match_loss, \
+                    background_non_match_loss, blind_non_match_loss = loss_composer.get_loss(pixelwise_contrastive_loss, match_type,
+                                                                                    image_a_pred, image_b_pred,
+                                                                                    matches_a,     matches_b,
+                                                                                    masked_non_matches_a, masked_non_matches_b,
+                                                                                    background_non_matches_a, background_non_matches_b,
+                                                                                    blind_non_matches_a, blind_non_matches_b)
 
                 loss.backward()
                 optimizer.step()
@@ -411,7 +425,7 @@ class DenseCorrespondenceTraining(object):
                     if data_type == SpartanDatasetDataType.DIFFERENT_OBJECT:
                         self._tensorboard_logger.log_value("train different object", loss.item(), loss_current_iteration)
 
-                update_plots(loss, match_loss, masked_non_match_loss, background_non_match_loss, blind_non_match_loss)
+                # update_plots(loss, match_loss, masked_non_match_loss, background_non_match_loss, blind_non_match_loss)
 
                 if loss_current_iteration % save_rate == 0:
                     print("Saving model at iter: ", loss_current_iteration)
@@ -421,7 +435,7 @@ class DenseCorrespondenceTraining(object):
                                       last_only=True)
 
                 if loss_current_iteration % logging_rate == 0:
-                    print("Logging at iter: ", loss_current_iteration)
+                    print("Logging at iter: ", loss_current_iteration, loss)
                     logging.info("Training on iteration %d of %d" %(loss_current_iteration, max_num_iterations))
 
                     logging.info("single iteration took %.3f seconds" %(elapsed))
@@ -431,7 +445,8 @@ class DenseCorrespondenceTraining(object):
 
 
                 # don't compute the test loss on the first few times through the loop
-                if self._config["training"]["compute_test_loss"] and (loss_current_iteration % compute_test_loss_rate == 0) and loss_current_iteration > 5:
+                if self._config["training"]["compute_test_loss"] and (loss_current_iteration % compute_test_loss_rate
+                                                                      == 0) and loss_current_iteration > 5:
                     logging.info("Computing test loss")
 
                     # delete the loss, match_loss, non_match_loss variables so that

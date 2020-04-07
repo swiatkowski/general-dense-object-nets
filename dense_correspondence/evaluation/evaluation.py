@@ -439,7 +439,8 @@ class DenseCorrespondenceEvaluation(object):
                 continue
             rgb, _, _, _ = dataset.get_rgbd_mask_pose(scene_name, image_idx)
             rgb_tensor = dataset.rgb_image_to_tensor(rgb)
-            res = dcn.forward_single_image_tensor(rgb_tensor).data.cpu().numpy()
+            res, reliability = dcn.forward_single_image_tensor(rgb_tensor)
+            res = res.data.cpu().numpy()
             
             descriptor_images[scene_name][image_idx] = res
 
@@ -647,8 +648,10 @@ class DenseCorrespondenceEvaluation(object):
         rgb_b_tensor = dataset.rgb_image_to_tensor(rgb_b)
 
         # these are Variables holding torch.FloatTensors, first grab the data, then convert to numpy
-        res_a = dcn.forward_single_image_tensor(rgb_a_tensor).data.cpu().numpy()
-        res_b = dcn.forward_single_image_tensor(rgb_b_tensor).data.cpu().numpy()
+        res_a, reliability_a = dcn.forward_single_image_tensor(rgb_a_tensor)
+        res_b, reliability_b = dcn.forward_single_image_tensor(rgb_b_tensor)
+        res_a = res_a.data.cpu().numpy()
+        res_b = res_b.data.cpu().numpy()
 
         camera_intrinsics_a = dataset.get_camera_intrinsics(scene_name_a)
         camera_intrinsics_b = dataset.get_camera_intrinsics(scene_name_b)
@@ -728,7 +731,8 @@ class DenseCorrespondenceEvaluation(object):
                     continue
 
                 diff_rgb_a_tensor = dataset.rgb_image_to_tensor(diff_rgb_a)
-                diff_res_a = dcn.forward_single_image_tensor(diff_rgb_a_tensor).data.cpu().numpy()
+                diff_res_a, reliability_a = dcn.forward_single_image_tensor(diff_rgb_a_tensor)
+                diff_res_a = diff_res_a.data.cpu().numpy()
 
 
                 diff_uv_a = (diff_uv_a_vec[0][0], diff_uv_a_vec[1][0])
@@ -763,7 +767,8 @@ class DenseCorrespondenceEvaluation(object):
                     continue
 
                 diff_rgb_b_tensor = dataset.rgb_image_to_tensor(diff_rgb_b)
-                diff_res_b = dcn.forward_single_image_tensor(diff_rgb_b_tensor).data.cpu().numpy()
+                diff_res_b, reliability_b = dcn.forward_single_image_tensor(diff_rgb_b_tensor)
+                diff_res_b = diff_res_b.data.cpu().numpy()
 
                 diff_uv_b = (diff_uv_b_vec[0][0], diff_uv_b_vec[1][0])
                 diff_uv_b = DCE.clip_pixel_to_image_size_and_round(diff_uv_b, image_width, image_height)
@@ -817,8 +822,10 @@ class DenseCorrespondenceEvaluation(object):
         rgb_b_tensor = dataset.rgb_image_to_tensor(rgb_b)
 
         # these are Variables holding torch.FloatTensors, first grab the data, then convert to numpy
-        res_a = dcn.forward_single_image_tensor(rgb_a_tensor).data.cpu().numpy()
-        res_b = dcn.forward_single_image_tensor(rgb_b_tensor).data.cpu().numpy()
+        res_a, reliability_a = dcn.forward_single_image_tensor(rgb_a_tensor)
+        res_b, reliability_b = dcn.forward_single_image_tensor(rgb_b_tensor)
+        res_a = res_a.data.cpu().numpy()
+        res_b = res_b.data.cpu().numpy()
 
         # container to hold a list of pandas dataframe
         # will eventually combine them all with concat
@@ -897,8 +904,10 @@ class DenseCorrespondenceEvaluation(object):
         rgb_b_tensor = dataset.rgb_image_to_tensor(rgb_b)
 
         # these are Variables holding torch.FloatTensors, first grab the data, then convert to numpy
-        res_a = dcn.forward_single_image_tensor(rgb_a_tensor).data.cpu().numpy()
-        res_b = dcn.forward_single_image_tensor(rgb_b_tensor).data.cpu().numpy()
+        res_a, reliability_a = dcn.forward_single_image_tensor(rgb_a_tensor)
+        res_b, reliability_b = dcn.forward_single_image_tensor(rgb_b_tensor)
+        res_a = res_a.data.cpu().numpy()
+        res_b = res_b.data.cpu().numpy()
 
         if camera_intrinsics_matrix is None:
             camera_intrinsics = dataset.get_camera_intrinsics(scene_name)
@@ -1299,8 +1308,10 @@ class DenseCorrespondenceEvaluation(object):
         rgb_b_tensor = dataset.rgb_image_to_tensor(rgb_b)
 
         # these are Variables holding torch.FloatTensors, first grab the data, then convert to numpy
-        res_a = dcn.forward_single_image_tensor(rgb_a_tensor).data.cpu().numpy()
-        res_b = dcn.forward_single_image_tensor(rgb_b_tensor).data.cpu().numpy()
+        res_a, reliability_a = dcn.forward_single_image_tensor(rgb_a_tensor)
+        res_b, reliability_b = dcn.forward_single_image_tensor(rgb_b_tensor)
+        res_a = res_a.data.cpu().numpy()
+        res_b = res_b.data.cpu().numpy()
 
         best_match_uv, best_match_diff, norm_diffs = \
         DenseCorrespondenceNetwork.find_best_match(uv_a, res_a, res_b, debug=False)
@@ -1373,8 +1384,10 @@ class DenseCorrespondenceEvaluation(object):
         rgb_b_tensor = dataset.rgb_image_to_tensor(rgb_b)
 
         # these are Variables holding torch.FloatTensors, first grab the data, then convert to numpy
-        res_a = dcn.forward_single_image_tensor(rgb_a_tensor).data.cpu().numpy()
-        res_b = dcn.forward_single_image_tensor(rgb_b_tensor).data.cpu().numpy()
+        res_a, reliability_a = dcn.forward_single_image_tensor(rgb_a_tensor)
+        res_b, reliability_b = dcn.forward_single_image_tensor(rgb_b_tensor)
+        res_a = res_a.data.cpu().numpy()
+        res_b = res_b.data.cpu().numpy()
 
 
         # sample points on img_a. Compute best matches on img_b
@@ -1473,8 +1486,10 @@ class DenseCorrespondenceEvaluation(object):
             rgb_b_tensor = dataset.rgb_image_to_tensor(rgb_b)
 
             # these are Variables holding torch.FloatTensors, first grab the data, then convert to numpy
-            res_a = dcn.forward_single_image_tensor(rgb_a_tensor).data.cpu().numpy()
-            res_b = dcn.forward_single_image_tensor(rgb_b_tensor).data.cpu().numpy()
+            res_a, reliability_a = dcn.forward_single_image_tensor(rgb_a_tensor)
+            res_b, reliability_b = dcn.forward_single_image_tensor(rgb_b_tensor)
+            res_a = res_a.data.cpu().numpy()
+            res_b = res_b.data.cpu().numpy()
 
 
         # vectors to allow re-ordering
@@ -2115,11 +2130,11 @@ class DenseCorrespondenceEvaluation(object):
                 non_matches_b = Variable(non_matches_b.cuda().squeeze(0), requires_grad=False)
 
             # run both images through the network
-            image_a_pred = dcn.forward(img_a)
-            image_a_pred = dcn.process_network_output(image_a_pred, batch_size)
+            image_a_pred, reliability_a = dcn.forward(img_a)
+            image_a_pred, reliability_a = dcn.process_network_output(image_a_pred, reliability_a, batch_size)
 
-            image_b_pred = dcn.forward(img_b)
-            image_b_pred = dcn.process_network_output(image_b_pred, batch_size)
+            image_b_pred, reliability_b = dcn.forward(img_b)
+            image_b_pred, reliability_b = dcn.process_network_output(image_b_pred, reliability_b, batch_size)
 
             # get loss
             if data_type == "matches":
@@ -2270,7 +2285,7 @@ class DenseCorrespondenceEvaluation(object):
         for i in xrange(0,num_images):
             rgb, depth, mask, _ = dataset.get_random_rgbd_mask_pose()
             img_tensor = dataset.rgb_image_to_tensor(rgb)
-            res = dcn.forward_single_image_tensor(img_tensor)  # [H, W, D]
+            res, reliability = dcn.forward_single_image_tensor(img_tensor)  # [H, W, D]
 
             mask_tensor = to_tensor(mask).cuda()
             entire_image_stats, mask_image_stats = compute_descriptor_statistics(res, mask_tensor)
@@ -2530,7 +2545,7 @@ class DenseCorrespondenceEvaluation(object):
             # plt.show()
 
             img_tensor = dataset.rgb_image_to_tensor(rgb)
-            res = dcn.forward_single_image_tensor(img_tensor)  # [H, W, D]
+            res, reliability = dcn.forward_single_image_tensor(img_tensor)  # [H, W, D]
             res = res.data.cpu().numpy()
 
             descriptors_object = np.zeros((len(object_u_samples),d))

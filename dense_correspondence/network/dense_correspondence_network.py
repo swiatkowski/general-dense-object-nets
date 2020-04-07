@@ -12,6 +12,7 @@ from PIL import Image
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torchvision import transforms
 import pytorch_segmentation_detection.models.resnet_dilated as resnet_dilated
 from dense_correspondence.dataset.spartan_dataset_masked import SpartanDataset
@@ -252,15 +253,19 @@ class DenseCorrespondenceNetwork(nn.Module):
         :rtype:
         """
 
+        # print self.fcn
+        if hasattr(self.fcn, 'num_outputs') and self.fcn.num_outputs == 2:
+            return self.fcn(img_tensor)
+
         res = self.fcn(img_tensor)
+        #TODO: add eps
         if self._normalize:
             #print "normalizing descriptor norm"
             norm = torch.norm(res, 2, 1) # [N,1,H,W]
             res = res/norm
+            assert False
 
-
-
-        return res
+        return res, None
 
     def forward_single_image_tensor(self, img_tensor):
         """
@@ -286,21 +291,22 @@ class DenseCorrespondenceNetwork(nn.Module):
         img_tensor = torch.tensor(img_tensor, device=torch.device("cuda"))
 
 
-        res = self.forward(img_tensor) # shape [1,D,H,W]
+        res, reliability_map = self.forward(img_tensor) # shape [1,D,H,W]
         # print "res.shape 1", res.shape
 
 
         res = res.squeeze(0) # shape [D,H,W]
+        reliability_map = reliability_map.squeeze(0)
         # print "res.shape 2", res.shape
 
         res = res.permute(1,2,0) # shape [H,W,D]
         # print "res.shape 3", res.shape
 
-        return res
+        return res, reliability_map
 
 
 
-    def process_network_output(self, image_pred, N):
+    def process_network_output(self, image_pred, reliability_map, N):
         """
         Processes the network output into a new shape
 
@@ -316,7 +322,8 @@ class DenseCorrespondenceNetwork(nn.Module):
         H = self._image_height
         image_pred = image_pred.view(N, self.descriptor_dimension, W * H)
         image_pred = image_pred.permute(0, 2, 1)
-        return image_pred
+        reliability_map = reliability_map.view(N, W * H)
+        return image_pred, reliability_map
 
     def clip_pixel_to_image_size_and_round(self, uv):
         """
@@ -376,6 +383,9 @@ class DenseCorrespondenceNetwork(nn.Module):
         
         elif config["backbone"]["model_class"] == "Unet":
             fcn = DenseCorrespondenceNetwork.get_unet(config)
+
+        elif config["backbone"]["model_class"] == "Reliability":
+            fcn = Resnet34_8s_Reliability(config['descriptor_dimension'])
 
         else:
             raise ValueError("Can't build backbone network.  I don't know this backbone model class!")
@@ -578,3 +588,31 @@ class DenseCorrespondenceNetwork(nn.Module):
         des = np.array(des, dtype=np.float32)
         return des
 
+
+# class Resnet34_8s_Reliability(resnet_dilated.Resnet34_8s):
+#     def __init__(self, descriptor_dimension):
+#         super(Resnet34_8s_Reliability, self).__init__(descriptor_dimension)
+#         self.reliability_layer = nn.Conv2d(descriptor_dimension, 1, 1)
+#         self._normal_initialization(self.reliability_layer)
+#         self.num_outputs = 2
+#
+#     def forward(self, x, feature_alignment=False):
+#         x = super(Resnet34_8s_Reliability, self).forward(x)
+#         descriptors_output = F.normalize(x, p=2, dim=1)
+#         x_squared = self.reliability_layer(x**2)
+#         x_reshaped = x_squared.view(x.shape[0], x.shape[2] * x.shape[3])
+#         reliability_output = F.softmax(x_reshaped, dim=1).view(x.shape[0], x.shape[2], x.shape[3])
+#         return descriptors_output, reliability_output
+
+class Resnet34_8s_Reliability(resnet_dilated.Resnet34_8s):
+    def __init__(self, descriptor_dimension):
+        super(Resnet34_8s_Reliability, self).__init__(descriptor_dimension + 1)
+        self._descriptor_dimension = descriptor_dimension
+        self.num_outputs = 2
+
+    def forward(self, x, feature_alignment=False):
+        x = super(Resnet34_8s_Reliability, self).forward(x)
+        descriptors_output, reliability_output = torch.split(x, split_size_or_sections=self._descriptor_dimension, dim=1)
+        descriptors_output = F.normalize(descriptors_output, p=2, dim=1)
+        reliability_output = F.softplus(reliability_output) + 1e-12
+        return descriptors_output, reliability_output
