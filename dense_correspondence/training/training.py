@@ -15,11 +15,7 @@ from torchvision import transforms
 from torch.autograd import Variable
 import torch.nn as nn
 import torch.optim as optim
-
-
 import tensorboard_logger
-
-
 
 
 # dense correspondence
@@ -39,8 +35,11 @@ from dense_correspondence.dataset.spartan_dataset_masked import SpartanDataset, 
 from dense_correspondence.network.dense_correspondence_network import DenseCorrespondenceNetwork
 
 from dense_correspondence.loss_functions.pixelwise_contrastive_loss import PixelwiseContrastiveLoss
+from dense_correspondence.loss_functions.ap_loss import PixelAPLoss, RingSampler
 import dense_correspondence.loss_functions.loss_composer as loss_composer
 from dense_correspondence.evaluation.evaluation import DenseCorrespondenceEvaluation
+from dense_correspondence.evaluation.plotting import normalize_descriptor
+from dense_correspondence.logging.dispatcher import dispatch_logger
 
 from dense_correspondence.loss_functions.probabilistic_loss import ProbabilisticLoss
 
@@ -56,6 +55,7 @@ class DenseCorrespondenceTraining(object):
 
         self._dcn = None
         self._optimizer = None
+        self.logger = dispatch_logger(self._config)
 
     def setup(self):
         """
@@ -90,7 +90,7 @@ class DenseCorrespondenceTraining(object):
         if self._dataset is None:
             self._dataset = SpartanDataset.make_default_10_scenes_drill()
 
-        
+
         self._dataset.load_all_pose_data()
         self._dataset.set_parameters_from_training_config(self._config)
 
@@ -102,7 +102,7 @@ class DenseCorrespondenceTraining(object):
             if self._dataset_test is None:
                 self._dataset_test = SpartanDataset(mode="test", config=self._dataset.config)
 
-            
+
             self._dataset_test.load_all_pose_data()
             self._dataset_test.set_parameters_from_training_config(self._config)
 
@@ -232,7 +232,6 @@ class DenseCorrespondenceTraining(object):
         :return:
         :rtype:
         """
-
         start_iteration = copy.copy(loss_current_iteration)
 
         DCE = DenseCorrespondenceEvaluation
@@ -259,8 +258,20 @@ class DenseCorrespondenceTraining(object):
         optimizer = self._optimizer
         batch_size = self._data_loader.batch_size
 
-        pixelwise_contrastive_loss = PixelwiseContrastiveLoss(image_shape=dcn.image_shape, config=self._config['loss_function'])
-        pixelwise_contrastive_loss.debug = True
+        loss_function = None
+        if self._config['loss_function']['name'] == 'pixelwise_contrastive_loss':
+            pixelwise_contrastive_loss = PixelwiseContrastiveLoss(image_shape=dcn.image_shape, config=self._config['loss_function'])
+            pixelwise_contrastive_loss.debug = True
+            loss_function = pixelwise_contrastive_loss
+        elif self._config['loss_function']['name'] == 'aploss':
+            inner_radius = self._config['loss_function']['inner_radius']
+            outter_radius =self._config['loss_function']['outter_radius']
+            num_samples =self._config['loss_function']['num_negative_samples']
+            sampler = RingSampler(inner_radius, outter_radius)
+            loss_function = PixelAPLoss(nq=25, sampler=sampler, num_negative_samples=num_samples) # nq hyperparam todo
+            loss_function.cuda()
+        else:
+            raise ValueError("Couldn't find your loss_function: " + self._config['loss_function']['name'])
 
         probabilistic_loss = ProbabilisticLoss(image_shape=dcn.image_shape, config=self._config['loss_function'])
 
@@ -274,7 +285,7 @@ class DenseCorrespondenceTraining(object):
         # logging
         self._logging_dict = dict()
         self._logging_dict['train'] = {"iteration": [], "loss": [], "match_loss": [],
-                                           "masked_non_match_loss": [], 
+                                           "masked_non_match_loss": [],
                                            "background_non_match_loss": [],
                                            "blind_non_match_loss": [],
                                            "learning_rate": [],
@@ -287,15 +298,14 @@ class DenseCorrespondenceTraining(object):
         if not use_pretrained:
             self.save_network(dcn, optimizer, 0)
 
-        # from training_progress_visualizer import TrainingProgressVisualizer
-        # TPV = TrainingProgressVisualizer()
-
+        total_time = time.time()
         for epoch in range(50):  # loop over the dataset multiple times
-
             for i, data in enumerate(self._data_loader, 0):
                 loss_current_iteration += 1
-                start_iter = time.time()
-                print('Current iter: ', loss_current_iteration)
+                self.logger.log('epoch', epoch)
+                self.logger.log('iteration', loss_current_iteration)
+
+                iteration_time = time.time()
 
                 match_type, \
                 img_a, img_b, \
@@ -309,9 +319,8 @@ class DenseCorrespondenceTraining(object):
                     print "\n empty data, continuing \n"
                     continue
 
-
                 data_type = metadata["type"][0]
-                
+
                 img_a = Variable(img_a.cuda(), requires_grad=False)
                 img_b = Variable(img_b.cuda(), requires_grad=False)
 
@@ -328,42 +337,61 @@ class DenseCorrespondenceTraining(object):
 
                 optimizer.zero_grad()
                 self.adjust_learning_rate(optimizer, loss_current_iteration)
+                self.logger.log('learning rate', self.get_learning_rate(optimizer))
 
                 # run both images through the network
-                image_a_pred, reliability_a = dcn.forward(img_a)
-                image_a_pred, reliability_a = dcn.process_network_output(image_a_pred, reliability_a, batch_size)
+                image_a_pred_, reliability_a_ = dcn.forward(img_a)
+                image_a_pred, reliability_a = dcn.process_network_output(image_a_pred_, reliability_a_, batch_size)
 
-                image_b_pred, reliability_b = dcn.forward(img_b)
-                image_b_pred, reliability_b = dcn.process_network_output(image_b_pred, reliability_b, batch_size)
+                image_b_pred_, reliability_b_ = dcn.forward(img_b)
+                image_b_pred, reliability_b = dcn.process_network_output(image_b_pred_, reliability_b_, batch_size)
 
                 # print("image_a_pred", image_a_pred.shape, image_a_pred.sum(dim=[0,1,2]))
                 # print("reliability_a", reliability_a.shape, reliability_a.sum(dim=[0, 1]))
 
                 # get loss
-                if "name" in self._config["loss_function"] and self._config["loss_function"]["name"] == "probabilistic_loss":
-                    loss = probabilistic_loss.get_loss(match_type,
-                                                image_a_pred, image_b_pred,
-                                                reliability_a, reliability_b,
-                                                matches_a, matches_b,
-                                                masked_non_matches_a, masked_non_matches_b,
-                                                background_non_matches_a, background_non_matches_b,
-                                                blind_non_matches_a, blind_non_matches_b)
-                else:
+                loss, match_loss, masked_non_match_loss, background_non_match_loss, blind_non_match_loss = 0, 0, 0, 0, 0
+                if self._config['loss_function']['name'] == 'pixelwise_contrastive_loss':
                     loss, match_loss, masked_non_match_loss, \
-                    background_non_match_loss, blind_non_match_loss = loss_composer.get_loss(pixelwise_contrastive_loss, match_type,
-                                                                                    image_a_pred, image_b_pred,
-                                                                                    matches_a,     matches_b,
-                                                                                    masked_non_matches_a, masked_non_matches_b,
-                                                                                    background_non_matches_a, background_non_matches_b,
-                                                                                    blind_non_matches_a, blind_non_matches_b)
+                    background_non_match_loss, blind_non_match_loss = loss_composer.get_loss(pixelwise_contrastive_loss,
+                                                                                             match_type,
+                                                                                             image_a_pred, image_b_pred,
+                                                                                             matches_a, matches_b,
+                                                                                             masked_non_matches_a,
+                                                                                             masked_non_matches_b,
+                                                                                             background_non_matches_a,
+                                                                                             background_non_matches_b,
+                                                                                             blind_non_matches_a,
+                                                                                             blind_non_matches_b)
+                    self.logger.log('loss', loss.item())
+                    self.logger.log('match_loss', match_loss.item())
+                    self.logger.log('masked_non_match_loss', masked_non_match_loss.item())
+                    self.logger.log('background_non_match_loss', background_non_match_loss.item())
+                    self.logger.log('blind_non_match_loss', blind_non_match_loss.item())
+
+                elif self._config['loss_function']['name'] == 'aploss':
+                    loss = loss_function(image_a_pred, image_b_pred, matches_a, matches_b)
+                    self.logger.log('loss', loss.item())
+
+                elif self._config['loss_function']['name'] == 'probabilistic_loss':
+                    loss = probabilistic_loss.get_loss(match_type,
+                                                       image_a_pred, image_b_pred,
+                                                       reliability_a, reliability_b,
+                                                       matches_a, matches_b,
+                                                       masked_non_matches_a, masked_non_matches_b,
+                                                       background_non_matches_a, background_non_matches_b,
+                                                       blind_non_matches_a, blind_non_matches_b)
+                    self.logger.log('loss', loss.item())
+
+                else:
+                    raise NotImplementedError('loss function')
 
                 loss.backward()
                 optimizer.step()
 
-                #if i % 10 == 0:
-                # TPV.update(self._dataset, dcn, loss_current_iteration, now_training_object_id=metadata["object_id"])
-
-                elapsed = time.time() - start_iter
+                elapsed = time.time() - iteration_time
+                self.logger.log('elapsed', time.time() - iteration_time)
+                self.logger.log('total time', time.time() - total_time)
 
                 def update_plots(loss, match_loss, masked_non_match_loss, background_non_match_loss, blind_non_match_loss):
                     """
@@ -372,12 +400,9 @@ class DenseCorrespondenceTraining(object):
                     :rtype:
                     """
 
-
-
                     learning_rate = DenseCorrespondenceTraining.get_learning_rate(optimizer)
                     self._logging_dict['train']['learning_rate'].append(learning_rate)
                     self._tensorboard_logger.log_value("learning rate", learning_rate, loss_current_iteration)
-
 
                     # Don't update any plots if the entry corresponding to that term
                     # is a zero loss
@@ -415,7 +440,7 @@ class DenseCorrespondenceTraining(object):
 
                     elif data_type == SpartanDatasetDataType.MULTI_OBJECT:
                         self._tensorboard_logger.log_value("train loss MULTI_OBJECT", loss.item(), loss_current_iteration)
-                    
+
                     elif data_type == SpartanDatasetDataType.SYNTHETIC_MULTI_OBJECT:
                         self._tensorboard_logger.log_value("train loss SYNTHETIC_MULTI_OBJECT", loss.item(), loss_current_iteration)
                     else:
@@ -425,24 +450,18 @@ class DenseCorrespondenceTraining(object):
                     if data_type == SpartanDatasetDataType.DIFFERENT_OBJECT:
                         self._tensorboard_logger.log_value("train different object", loss.item(), loss_current_iteration)
 
-                # update_plots(loss, match_loss, masked_non_match_loss, background_non_match_loss, blind_non_match_loss)
+                update_plots(loss, match_loss, masked_non_match_loss, background_non_match_loss, blind_non_match_loss)
 
                 if loss_current_iteration % save_rate == 0:
                     print("Saving model at iter: ", loss_current_iteration)
-                    self.save_network(dcn, optimizer,
-                                      loss_current_iteration,
-                                      logging_dict=self._logging_dict,
-                                      last_only=True)
+                    self.save_network(dcn, optimizer, loss_current_iteration, logging_dict=self._logging_dict, last_only=True)
 
-                if loss_current_iteration % logging_rate == 0:
-                    print("Logging at iter: ", loss_current_iteration, loss)
-                    logging.info("Training on iteration %d of %d" %(loss_current_iteration, max_num_iterations))
-
-                    logging.info("single iteration took %.3f seconds" %(elapsed))
-
-                    percent_complete = loss_current_iteration * 100.0/(max_num_iterations - start_iteration)
-                    logging.info("Training is %d percent complete\n" %(percent_complete))
-
+                if i % self._config["logging"]["qualitative_evaluation_logging_rate"] == 0:
+                    evaluations = DCE.evaluate_network_qualitative_without_plotting(dcn, dataset=self.dataset, randomize=True)
+                    for e, _ in evaluations['train_evals']:
+                        self.logger.log('Train eval - iter {}'.format(i), e * 255.0, 'image')
+                    for e, _ in evaluations['test_evals']:
+                        self.logger.log('Test eval - iter {}'.format(i), e * 255.0, 'image')
 
                 # don't compute the test loss on the first few times through the loop
                 if self._config["training"]["compute_test_loss"] and (loss_current_iteration % compute_test_loss_rate
@@ -455,8 +474,7 @@ class DenseCorrespondenceTraining(object):
                     gc.collect()
 
                     dcn.eval()
-                    test_loss, test_match_loss, test_non_match_loss = DCE.compute_loss_on_dataset(dcn,
-                                                                                                  self._data_loader_test, self._config['loss_function'], num_iterations=self._config['training']['test_loss_num_iterations'])
+                    test_loss, test_match_loss, test_non_match_loss = DCE.compute_loss_on_dataset(dcn, self._data_loader_test, self._config['loss_function'], num_iterations=self._config['training']['test_loss_num_iterations'])
 
                     # delete these variables so we can free GPU memory
                     del test_loss, test_match_loss, test_non_match_loss
@@ -471,11 +489,19 @@ class DenseCorrespondenceTraining(object):
                     gc_elapsed = time.time() - gc_start
                     logging.debug("garbage collection took %.2d seconds" %(gc_elapsed))
 
+
+                self.logger.send_logs()
+
                 if loss_current_iteration > max_num_iterations:
                     logging.info("Finished testing after %d iterations" % (max_num_iterations))
                     self.save_network(dcn, optimizer, loss_current_iteration, logging_dict=self._logging_dict)
+                    self.logger.exit()
                     return
 
+
+    def log_prediction(self, descriptor, iter):
+        normalized_descriptor = normalize_descriptor(descriptor.detach().cpu().numpy().transpose(1,2,0)) * 255
+        self.logger.log(iter, normalized_descriptor, 'image')
 
     def setup_logging_dir(self):
         """
@@ -629,4 +655,3 @@ class DenseCorrespondenceTraining(object):
     def make_default():
         dataset = SpartanDataset.make_default_caterpillar()
         return DenseCorrespondenceTraining(dataset=dataset)
-

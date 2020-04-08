@@ -49,6 +49,7 @@ dense_correspondence_network:
 
 
 loss_function:
+  name: 'aploss'  # pixelwise_contrastive_loss
   M_masked: 0.5 # margin for masked non-match descriptor distance
   M_background: 0.5 # margin for background
   M_pixel: 50 # Clamp for pixel distance
@@ -60,3 +61,13 @@ loss_function:
   scale_by_hard_negatives_DIFFERENT_OBJECT: True
   alpha_triplet: 0.1
 
+logging:
+  backend: 'neptune'
+  namespace: 'general-dense-object-nets'
+  project: 'general-dense-object-nets'
+  experiment: 'shoes'
+  description: 'This is example description'
+  tags: # list as many tags you want. They intend to help you search/filter experiemnts
+    - 'general-dense-object-nets'
+    - 'unknown_user'
+    - 'aploss'

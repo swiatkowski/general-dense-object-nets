@@ -5,7 +5,7 @@
 #SBATCH --qos=8gpu3d
 #SBATCH --gres=gpu:1
 /bin/hostname
-singularity run --nv \
+singularity exec --nv \
   --bind /scidatasm/dense_object_nets/data:/home/$USER/data \
   --bind /results/$USER/general-dense-object-nets:/home/$USER/code \
   /results/$USER/gdon_latest.sif \

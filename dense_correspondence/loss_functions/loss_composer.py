@@ -4,7 +4,7 @@ from dense_correspondence.loss_functions.pixelwise_contrastive_loss import Pixel
 import torch
 from torch.autograd import Variable
 
-def get_loss(pixelwise_contrastive_loss, match_type, 
+def get_loss(pixelwise_contrastive_loss, match_type,
               image_a_pred, image_b_pred,
               matches_a,     matches_b,
               masked_non_matches_a, masked_non_matches_b,
@@ -85,16 +85,16 @@ def get_within_scene_loss(pixelwise_contrastive_loss, image_a_pred, image_b_pred
 
     if pcl._config["use_l2_pixel_loss_on_background_non_matches"]:
         background_non_match_loss, num_background_hard_negatives =\
-            pixelwise_contrastive_loss.non_match_loss_with_l2_pixel_norm(image_a_pred, image_b_pred, matches_b, 
-                background_non_matches_a, background_non_matches_b, M_descriptor=pcl._config["M_background"])    
-        
+            pixelwise_contrastive_loss.non_match_loss_with_l2_pixel_norm(image_a_pred, image_b_pred, matches_b,
+                background_non_matches_a, background_non_matches_b, M_descriptor=pcl._config["M_background"])
+
     else:
         background_non_match_loss, num_background_hard_negatives =\
             pixelwise_contrastive_loss.non_match_loss_descriptor_only(image_a_pred, image_b_pred,
                                                                     background_non_matches_a, background_non_matches_b,
                                                                     M_descriptor=pcl._config["M_background"])
-        
-        
+
+
 
     blind_non_match_loss = zero_loss()
     num_blind_hard_negatives = 1
@@ -103,7 +103,7 @@ def get_within_scene_loss(pixelwise_contrastive_loss, image_a_pred, image_b_pred
             pixelwise_contrastive_loss.non_match_loss_descriptor_only(image_a_pred, image_b_pred,
                                                                     blind_non_matches_a, blind_non_matches_b,
                                                                     M_descriptor=pcl._config["M_masked"])
-        
+
 
 
     total_num_hard_negatives = num_masked_hard_negatives + num_background_hard_negatives
@@ -138,7 +138,7 @@ def get_within_scene_loss(pixelwise_contrastive_loss, image_a_pred, image_b_pred
     loss = pcl._config["match_loss_weight"] * match_loss + \
     pcl._config["non_match_loss_weight"] * non_match_loss
 
-    
+
 
     return loss, match_loss, masked_non_match_loss_scaled, background_non_match_loss_scaled, blind_non_match_loss_scaled
 
@@ -150,15 +150,15 @@ def get_within_scene_loss_triplet(pixelwise_contrastive_loss, image_a_pred, imag
     """
     Simple wrapper for pixelwise_contrastive_loss functions.  Args and return args documented above in get_loss()
     """
-    
+
     pcl = pixelwise_contrastive_loss
 
     masked_triplet_loss =\
-        pixelwise_contrastive_loss.get_triplet_loss(image_a_pred, image_b_pred, matches_a, 
+        pixelwise_contrastive_loss.get_triplet_loss(image_a_pred, image_b_pred, matches_a,
             matches_b, masked_non_matches_a, masked_non_matches_b, pcl._config["alpha_triplet"])
-        
+
     background_triplet_loss =\
-        pixelwise_contrastive_loss.get_triplet_loss(image_a_pred, image_b_pred, matches_a, 
+        pixelwise_contrastive_loss.get_triplet_loss(image_a_pred, image_b_pred, matches_a,
             matches_b, background_non_matches_a, background_non_matches_b, pcl._config["alpha_triplet"])
 
     total_loss = masked_triplet_loss + background_triplet_loss
@@ -180,7 +180,7 @@ def get_different_object_loss(pixelwise_contrastive_loss, image_a_pred, image_b_
             pixelwise_contrastive_loss.non_match_loss_descriptor_only(image_a_pred, image_b_pred,
                                                                     blind_non_matches_a, blind_non_matches_b,
                                                                     M_descriptor=M_descriptor)
-        
+
         if scale_by_hard_negatives:
             scale_factor = max(num_hard_negatives, 1)
         else:
@@ -215,6 +215,6 @@ def zero_loss():
     return Variable(torch.FloatTensor([0]).cuda())
 
 def is_zero_loss(loss):
+    if isinstance(loss, int):
+        return loss < 1e-20
     return loss.item() < 1e-20
-
-
