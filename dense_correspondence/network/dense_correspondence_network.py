@@ -322,7 +322,8 @@ class DenseCorrespondenceNetwork(nn.Module):
         H = self._image_height
         image_pred = image_pred.view(N, self.descriptor_dimension, W * H)
         image_pred = image_pred.permute(0, 2, 1)
-        reliability_map = reliability_map.view(N, W * H)
+        if reliability_map:
+            reliability_map = reliability_map.view(N, W * H)
         return image_pred, reliability_map
 
     def clip_pixel_to_image_size_and_round(self, uv):
