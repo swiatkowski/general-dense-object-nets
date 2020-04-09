@@ -270,6 +270,8 @@ class DenseCorrespondenceTraining(object):
             sampler = RingSampler(inner_radius, outter_radius)
             loss_function = PixelAPLoss(nq=25, sampler=sampler, num_negative_samples=num_samples) # nq hyperparam todo
             loss_function.cuda()
+        elif self._config['loss_function']['name'] == 'probabilistic_loss':
+            pass
         else:
             raise ValueError("Couldn't find your loss_function: " + self._config['loss_function']['name'])
 

@@ -89,7 +89,7 @@ class ProbabilisticLoss:
 
         matching_score = (matches_a_descriptors * matches_b_descriptors).sum(dim=2).clamp(min=0)
         average_reliability = (matches_a_reliability + matches_b_reliability) / 2
-        unnormalized_distribution = torch.exp(matching_score / average_reliability).clamp(max=2**46)
+        unnormalized_distribution = torch.exp(matching_score / average_reliability)
 
         # print("matching_score", matching_score.shape, matching_score.sum().sum())
         # print("average_reliability", average_reliability.shape, average_reliability.sum().sum())
@@ -107,5 +107,5 @@ class ProbabilisticLoss:
 
         matching_score = (non_matches_a_descriptors * non_matches_b_descriptors).sum(dim=2).clamp(min=0)
         average_reliability = (non_matches_a_reliability + non_matches_b_reliability) / 2
-        unnormalized_distribution = torch.exp((1 - matching_score) / average_reliability).clamp(max=2**46)
+        unnormalized_distribution = torch.exp((1 - matching_score) / average_reliability)
         return unnormalized_distribution

@@ -261,7 +261,7 @@ class DenseCorrespondenceNetwork(nn.Module):
             #print "normalizing descriptor norm"
             norm = torch.norm(res, 2, 1) # [N,1,H,W]
             res = res/norm
-            assert False
+            assert False, 'checking whether this normalization is actually used by anyone'
 
         return res, None
 
@@ -294,7 +294,7 @@ class DenseCorrespondenceNetwork(nn.Module):
 
 
         res = res.squeeze(0) # shape [D,H,W]
-        if reliability_map:
+        if reliability_map is not None:
             reliability_map = reliability_map.squeeze(0)
         # print "res.shape 2", res.shape
 
@@ -321,7 +321,7 @@ class DenseCorrespondenceNetwork(nn.Module):
         H = self._image_height
         image_pred = image_pred.view(N, self.descriptor_dimension, W * H)
         image_pred = image_pred.permute(0, 2, 1)
-        if reliability_map:
+        if reliability_map is not None:
             reliability_map = reliability_map.view(N, W * H)
         return image_pred, reliability_map
 
@@ -380,13 +380,12 @@ class DenseCorrespondenceNetwork(nn.Module):
         if config["backbone"]["model_class"] == "Resnet":
             resnet_model = config["backbone"]["resnet_name"]
             fcn = getattr(resnet_dilated, resnet_model)(num_classes=config['descriptor_dimension'])
-
         elif config["backbone"]["model_class"] == "Unet":
             fcn = DenseCorrespondenceNetwork.get_unet(config)
-
-        elif config["backbone"]["model_class"] == "Reliability":
-            fcn = Resnet34_8s_Reliability(config['descriptor_dimension'])
-
+        elif config["backbone"]["model_class"] == "ReliabilitySoftplus":
+            fcn = ReliabilitySoftplus(config["backbone"]["resnet_name"], config['descriptor_dimension'])
+        elif config["backbone"]["model_class"] == "ReliabilityAddConvSoftplus":
+            fcn = ReliabilityAddConvSoftplus(config["backbone"]["resnet_name"], config['descriptor_dimension'])
         else:
             raise ValueError("Can't build backbone network.  I don't know this backbone model class!")
 
@@ -588,30 +587,34 @@ class DenseCorrespondenceNetwork(nn.Module):
         des = np.array(des, dtype=np.float32)
         return des
 
-# class Resnet34_8s_Reliability(resnet_dilated.Resnet34_8s):
-#     def __init__(self, descriptor_dimension):
-#         super(Resnet34_8s_Reliability, self).__init__(descriptor_dimension)
-#         self.reliability_layer = nn.Conv2d(descriptor_dimension, 1, 1)
-#         self._normal_initialization(self.reliability_layer)
-#         self.num_outputs = 2
-#
-#     def forward(self, x, feature_alignment=False):
-#         x = super(Resnet34_8s_Reliability, self).forward(x)
-#         descriptors_output = F.normalize(x, p=2, dim=1)
-#         x_squared = self.reliability_layer(x**2)
-#         x_reshaped = x_squared.view(x.shape[0], x.shape[2] * x.shape[3])
-#         reliability_output = F.softmax(x_reshaped, dim=1).view(x.shape[0], x.shape[2], x.shape[3])
-#         return descriptors_output, reliability_output
 
-class Resnet34_8s_Reliability(resnet_dilated.Resnet34_8s):
-    def __init__(self, descriptor_dimension):
-        super(Resnet34_8s_Reliability, self).__init__(descriptor_dimension + 1)
+class ReliabilitySoftplus(nn.Module):
+    def __init__(self, resnet_model, descriptor_dimension):
+        super(ReliabilitySoftplus, self).__init__()
+        self.resnet = getattr(resnet_dilated, resnet_model)(descriptor_dimension + 1)
         self._descriptor_dimension = descriptor_dimension
         self.num_outputs = 2
 
-    def forward(self, x, feature_alignment=False):
-        x = super(Resnet34_8s_Reliability, self).forward(x)
-        descriptors_output, reliability_output = torch.split(x, split_size_or_sections=self._descriptor_dimension, dim=1)
+    def forward(self, x):
+        x = self.resnet.forward(x)
+        descriptors_output, reliability_output = torch.split(x, split_size_or_sections=self._descriptor_dimension,
+                                                             dim=1)
         descriptors_output = F.normalize(descriptors_output, p=2, dim=1)
-        reliability_output = F.softplus(reliability_output) + 1e-12
+        reliability_output = F.softplus(reliability_output).clamp(min=1e-2)
+        return descriptors_output, reliability_output
+
+
+class ReliabilityAddConvSoftplus(nn.Module):
+    def __init__(self, resnet_model, descriptor_dimension):
+        super(ReliabilityAddConvSoftplus, self).__init__()
+        self.resnet = getattr(resnet_dilated, resnet_model)(descriptor_dimension)
+        self.reliability_layer = nn.Conv2d(in_channels=descriptor_dimension, out_channels=1, kernel_size=1)
+        self.resnet._normal_initialization(self.reliability_layer)
+        self._descriptor_dimension = descriptor_dimension
+        self.num_outputs = 2
+
+    def forward(self, x):
+        x = self.resnet.forward(x)
+        descriptors_output = F.normalize(x, p=2, dim=1)
+        reliability_output = F.softplus(self.reliability_layer(x)).clamp(min=1e-2)
         return descriptors_output, reliability_output

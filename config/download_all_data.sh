@@ -11,6 +11,8 @@ code_dir="/results/$USER/general-dense-object-nets"
 config_files="/$code_dir/config/dense_correspondence/dataset/composite/*"
 data_dir="/scidatalg/mlp2020_descriptors"
 
+mkdir -p $data_dir
+
 # Python env with pyyaml installed
 source "/results/$USER/pyenv2/bin/activate"
 command -v python
