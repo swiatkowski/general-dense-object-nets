@@ -5,7 +5,6 @@ matplotlib.use('Agg')
 import dense_correspondence_manipulation.utils.utils as utils
 utils.add_dense_correspondence_to_python_path()
 from dense_correspondence.training.training import *
-import sys
 import logging
 import os
 
@@ -29,17 +28,24 @@ train_config = utils.getDictFromYamlFilename(train_config_file)
 dataset = SpartanDataset(config=config)
 
 logging_dir = "trained_models"
-num_iterations = 4000
+num_iterations = 5000
 d = 3 # the descriptor dimension
-name = "caterpillar_%d_probabilistic" %(d)
+name = "caterpillar_%d_pixelwise" %(d)
 train_config["training"]["logging_dir_name"] = name
 train_config["training"]["logging_dir"] = logging_dir
 train_config["dense_correspondence_network"]["descriptor_dimension"] = d
 train_config["training"]["num_iterations"] = num_iterations
 
-train_config["dense_correspondence_network"]["backbone"]["model_class"] = "Reliability"
-train_config["dense_correspondence_network"]["backbone"]["resnet_name"] = "Resnet34_8s"
-train_config["loss_function"]["name"] = "probabilistic_loss"
+# train_config["dense_correspondence_network"]["backbone"]["model_class"] = "Reliability"
+# train_config["dense_correspondence_network"]["backbone"]["resnet_name"] = "Resnet34_8s"
+# train_config["loss_function"]["name"] = "probabilistic_loss"
+train_config["loss_function"]["name"] = "pixelwise_contrastive_loss"
+
+train_config["logging"]["namespace"] = "jkopanski"
+train_config["logging"]["experiment"] = "caterpillar"
+train_config["logging"]["description"] = "pixelwise_contrastive_loss"
+train_config["logging"]["tags"] = ['general-dense-object-nets', 'jkopanski', 'pixelwise_contrastive_loss']
+train_config["logging"]["qualitative_evaluation_logging_rate"] = 500
 
 TRAIN = True
 EVALUATE = True

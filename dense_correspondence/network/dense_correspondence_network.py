@@ -294,7 +294,8 @@ class DenseCorrespondenceNetwork(nn.Module):
 
 
         res = res.squeeze(0) # shape [D,H,W]
-        reliability_map = reliability_map.squeeze(0)
+        if reliability_map:
+            reliability_map = reliability_map.squeeze(0)
         # print "res.shape 2", res.shape
 
         res = res.permute(1,2,0) # shape [H,W,D]
