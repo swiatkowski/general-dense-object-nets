@@ -36,8 +36,10 @@ train_config["dense_correspondence_network"]["backbone"]["model_class"] = "Relia
 train_config["dense_correspondence_network"]["backbone"]["resnet_name"] = "Resnet34_8s"
 train_config["logging"]["namespace"] = "jkopanski"
 train_config["logging"]["experiment"] = "caterpillar"
-train_config["logging"]["description"] = "probabilistic_loss_softplus_lr1e-3"
+train_config["logging"]["description"] = "test_probabilistic_loss_softplus_lr1e-3"
 train_config["logging"]["tags"] = ['general-dense-object-nets', 'jkopanski', 'probabilistic_loss']
+
+# train_config["logging"]["qualitative_evaluation_logging_rate"] = 10
 
 # pixelwise_contrastive_loss
 # train_config["loss_function"]["name"] = "pixelwise_contrastive_loss"
