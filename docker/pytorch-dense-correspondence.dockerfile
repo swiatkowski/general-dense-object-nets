@@ -30,7 +30,7 @@ RUN usermod -u $USER_ID $USER_NAME
 WORKDIR /home/$USER_NAME
 ENV USER_HOME_DIR=/home/$USER_NAME
 
-# Strangly these packages are getting connection timed out when installed together with other packages.
+# Strangely these packages are getting connection timed out when installed together with other packages.
 RUN apt-get install -y --no-install-recommends libdrm2
 RUN apt-get install -y --no-install-recommends libva1
 RUN apt-get install -y --no-install-recommends python-gobject-2
