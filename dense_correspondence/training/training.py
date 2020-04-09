@@ -296,9 +296,10 @@ class DenseCorrespondenceTraining(object):
         self._logging_dict['test'] = {"iteration": [], "loss": [], "match_loss": [],
                                            "non_match_loss": []}
 
+        # What is this for?
         # save network before starting
-        if not use_pretrained:
-            self.save_network(dcn, optimizer, 0)
+        # if not use_pretrained:
+        #     self.save_network(dcn, optimizer, 0)
 
         total_time = time.time()
         for epoch in range(50):  # loop over the dataset multiple times
