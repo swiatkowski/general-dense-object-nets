@@ -298,8 +298,8 @@ class DenseCorrespondenceTraining(object):
 
         # What is this for?
         # save network before starting
-        # if not use_pretrained:
-        #     self.save_network(dcn, optimizer, 0)
+        if not use_pretrained:
+            self.save_network(dcn, optimizer, 0)
 
         total_time = time.time()
         for epoch in range(50):  # loop over the dataset multiple times
@@ -497,7 +497,8 @@ class DenseCorrespondenceTraining(object):
 
                 if loss_current_iteration > max_num_iterations:
                     logging.info("Finished testing after %d iterations" % (max_num_iterations))
-                    self.save_network(dcn, optimizer, loss_current_iteration, logging_dict=self._logging_dict)
+                    self.save_network(dcn, optimizer, loss_current_iteration, logging_dict=self._logging_dict,
+                                      last_only=False)
                     self.logger.exit()
                     return
 

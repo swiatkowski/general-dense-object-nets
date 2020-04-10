@@ -294,6 +294,8 @@ def get_model_param_file_from_directory(model_folder, iteration=None):
         pdc_path = getPdcPath()
         model_folder = os.path.join(pdc_path, "trained_models", model_folder)
 
+    print('Read model from {}'.format(model_folder))
+
     # find idx.pth and idx.pth.opt files
     if iteration is None:
         files = os.listdir(model_folder)

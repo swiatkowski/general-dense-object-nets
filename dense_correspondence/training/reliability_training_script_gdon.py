@@ -32,14 +32,11 @@ dataset = SpartanDataset(config=config)
 
 # probabilistic
 train_config["loss_function"]["name"] = "probabilistic_loss"
-train_config["dense_correspondence_network"]["backbone"]["model_class"] = "ReliabilitySoftplus"
-train_config["dense_correspondence_network"]["backbone"]["resnet_name"] = "Resnet34_8s"
 train_config["logging"]["namespace"] = "jkopanski"
 train_config["logging"]["experiment"] = "caterpillar"
-train_config["logging"]["description"] = "test_probabilistic_loss_softplus_lr1e-3"
+train_config["logging"]["description"] = "probabilistic_loss_add_conv_softplus_lr1e-3"
 train_config["logging"]["tags"] = ['general-dense-object-nets', 'jkopanski', 'probabilistic_loss']
-
-# train_config["logging"]["qualitative_evaluation_logging_rate"] = 10
+train_config["logging"]["qualitative_evaluation_logging_rate"] = 500
 
 # pixelwise_contrastive_loss
 # train_config["loss_function"]["name"] = "pixelwise_contrastive_loss"
@@ -55,30 +52,32 @@ train_config["logging"]["tags"] = ['general-dense-object-nets', 'jkopanski', 'pr
 # train_config["logging"]["description"] = "aploss"
 # train_config["logging"]["tags"] = ['general-dense-object-nets', 'jkopanski', 'aploss']
 
+# Common for all loss functions
+# train_config["dense_correspondence_network"]["backbone"]["model_class"] = 'ReliabilitySoftplus'
+train_config["dense_correspondence_network"]["backbone"]["model_class"] = 'ReliabilityAddConvSoftplus'
+train_config["dense_correspondence_network"]["backbone"]["resnet_name"] = "Resnet34_8s"
+train_config["dense_correspondence_network"]["descriptor_dimension"] = 3
 train_config["training"]["logging_dir_name"] = "{}_{}_{}".format(
     train_config["logging"]["experiment"],
     train_config["dense_correspondence_network"]["descriptor_dimension"],
     train_config["logging"]["description"])
-train_config["training"]["logging_dir"] = "trained_models"
+# train_config["training"]["logging_dir"] = os.path.join(os.environ['HOME'], 'models', 'trained_models')
+train_config["training"]["logging_dir"] = 'trained_models'
 train_config["training"]["num_iterations"] = 5000
 train_config["training"]["learning_rate"] = 1e-3
-train_config["dense_correspondence_network"]["descriptor_dimension"] = 3
 
 TRAIN = True
 EVALUATE = True
-
-# This statement is not true on Entropy
-# All of the saved data for this network will be located in the
-# code/data/pdc/trained_models/tutorials/caterpillar_3 folder
 
 if TRAIN:
     train = DenseCorrespondenceTraining(dataset=dataset, config=train_config)
     train.run()
 
 code_dir = os.environ['HOME'] + '/code'
-model_folder = os.path.join(code_dir, train_config["training"]["logging_dir"],
-                            train_config["training"]["logging_dir_name"])
+model_folder = os.path.join(code_dir, train_config["training"]["logging_dir"], train_config["training"]["logging_dir_name"])
 model_folder = utils.convert_data_relative_path_to_absolute_path(model_folder)
+
+# model_folder = os.path.join(train_config["training"]["logging_dir"], train_config["training"]["logging_dir_name"])
 
 if EVALUATE:
     DCE = DenseCorrespondenceEvaluation
