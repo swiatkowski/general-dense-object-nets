@@ -271,11 +271,9 @@ class DenseCorrespondenceTraining(object):
             loss_function = PixelAPLoss(nq=25, sampler=sampler, num_negative_samples=num_samples) # nq hyperparam todo
             loss_function.cuda()
         elif self._config['loss_function']['name'] == 'probabilistic_loss':
-            pass
+            probabilistic_loss = ProbabilisticLoss(image_shape=dcn.image_shape, config=self._config['loss_function'])
         else:
             raise ValueError("Couldn't find your loss_function: " + self._config['loss_function']['name'])
-
-        probabilistic_loss = ProbabilisticLoss(image_shape=dcn.image_shape, config=self._config['loss_function'])
 
         loss = match_loss = non_match_loss = 0
 
@@ -348,9 +346,6 @@ class DenseCorrespondenceTraining(object):
 
                 image_b_pred_, reliability_b_ = dcn.forward(img_b)
                 image_b_pred, reliability_b = dcn.process_network_output(image_b_pred_, reliability_b_, batch_size)
-
-                # print("image_a_pred", image_a_pred.shape, image_a_pred.sum(dim=[0,1,2]))
-                # print("reliability_a", reliability_a.shape, reliability_a.sum(dim=[0, 1]))
 
                 # get loss
                 loss, match_loss, masked_non_match_loss, background_non_match_loss, blind_non_match_loss = 0, 0, 0, 0, 0
