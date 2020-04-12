@@ -46,6 +46,8 @@ dense_correspondence_network:
     resnet_name: "Resnet34_8s"  # options: {Resnet34_8s, Resnet101_8s, etc.}
     # If Unet
     # currently no options supported
+  reliability: False
+  add_conv: True
 
 
 loss_function:

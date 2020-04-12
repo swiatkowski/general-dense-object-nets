@@ -261,7 +261,6 @@ class DenseCorrespondenceNetwork(nn.Module):
             #print "normalizing descriptor norm"
             norm = torch.norm(res, 2, 1) # [N,1,H,W]
             res = res/norm
-            assert False, 'checking whether this normalization is actually used by anyone'
 
         return res, None
 
@@ -379,13 +378,12 @@ class DenseCorrespondenceNetwork(nn.Module):
 
         if config["backbone"]["model_class"] == "Resnet":
             resnet_model = config["backbone"]["resnet_name"]
-            fcn = getattr(resnet_dilated, resnet_model)(num_classes=config['descriptor_dimension'])
+            if config["reliability"]:
+                fcn = ReliabilitySoftplus(resnet_model, config['descriptor_dimension'], config["add_conv"])
+            else:
+                fcn = getattr(resnet_dilated, resnet_model)(num_classes=config['descriptor_dimension'])
         elif config["backbone"]["model_class"] == "Unet":
             fcn = DenseCorrespondenceNetwork.get_unet(config)
-        elif config["backbone"]["model_class"] == "ReliabilitySoftplus":
-            fcn = ReliabilitySoftplus(config["backbone"]["resnet_name"], config['descriptor_dimension'])
-        elif config["backbone"]["model_class"] == "ReliabilityAddConvSoftplus":
-            fcn = ReliabilityAddConvSoftplus(config["backbone"]["resnet_name"], config['descriptor_dimension'])
         else:
             raise ValueError("Can't build backbone network.  I don't know this backbone model class!")
 
@@ -589,32 +587,26 @@ class DenseCorrespondenceNetwork(nn.Module):
 
 
 class ReliabilitySoftplus(nn.Module):
-    def __init__(self, resnet_model, descriptor_dimension):
+    def __init__(self, resnet_model, descriptor_dimension, add_conv=False):
         super(ReliabilitySoftplus, self).__init__()
-        self.resnet = getattr(resnet_dilated, resnet_model)(descriptor_dimension + 1)
+        if add_conv:
+            self.resnet = getattr(resnet_dilated, resnet_model)(descriptor_dimension)
+            self.reliability_layer = nn.Conv2d(in_channels=descriptor_dimension, out_channels=1, kernel_size=1)
+            self.resnet._normal_initialization(self.reliability_layer)
+        else:
+            self.resnet = getattr(resnet_dilated, resnet_model)(descriptor_dimension + 1)
         self._descriptor_dimension = descriptor_dimension
+        self._add_conv = add_conv
         self.num_outputs = 2
 
     def forward(self, x):
         x = self.resnet.forward(x)
-        descriptors_output, reliability_output = torch.split(x, split_size_or_sections=self._descriptor_dimension,
-                                                             dim=1)
+        if self._add_conv:
+            descriptors_output = x
+            reliability_output = self.reliability_layer(x)
+        else:
+            descriptors_output, reliability_output = torch.split(x, split_size_or_sections=self._descriptor_dimension,
+                                                                 dim=1)
         descriptors_output = F.normalize(descriptors_output, p=2, dim=1)
         reliability_output = F.softplus(reliability_output).clamp(min=1e-2)
-        return descriptors_output, reliability_output
-
-
-class ReliabilityAddConvSoftplus(nn.Module):
-    def __init__(self, resnet_model, descriptor_dimension):
-        super(ReliabilityAddConvSoftplus, self).__init__()
-        self.resnet = getattr(resnet_dilated, resnet_model)(descriptor_dimension)
-        self.reliability_layer = nn.Conv2d(in_channels=descriptor_dimension, out_channels=1, kernel_size=1)
-        self.resnet._normal_initialization(self.reliability_layer)
-        self._descriptor_dimension = descriptor_dimension
-        self.num_outputs = 2
-
-    def forward(self, x):
-        x = self.resnet.forward(x)
-        descriptors_output = F.normalize(x, p=2, dim=1)
-        reliability_output = F.softplus(self.reliability_layer(x)).clamp(min=1e-2)
         return descriptors_output, reliability_output
