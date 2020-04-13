@@ -31,11 +31,12 @@ from pytorch_segmentation_detection.transforms import (ComposeJoint,
                                                        RandomCropJoint,
                                                        Split2D)
 
-from dense_correspondence.dataset.spartan_dataset_masked import SpartanDataset, SpartanDatasetDataType
+from dense_correspondence.dataset.spartan_dataset_masked import SpartanDataset, SpartanDatasetDataType, DatasetItem
 from dense_correspondence.network.dense_correspondence_network import DenseCorrespondenceNetwork
 
 from dense_correspondence.loss_functions.pixelwise_contrastive_loss import PixelwiseContrastiveLoss
-from dense_correspondence.loss_functions.ap_loss import PixelAPLoss, RingSampler
+from dense_correspondence.loss_functions.ap_loss import PixelAPLoss
+from dense_correspondence.loss_functions.sampler import RingSampler, RandomSampler, DONSampler, dispatch_sampler
 import dense_correspondence.loss_functions.loss_composer as loss_composer
 from dense_correspondence.evaluation.evaluation import DenseCorrespondenceEvaluation
 from dense_correspondence.evaluation.plotting import normalize_descriptor
@@ -263,11 +264,12 @@ class DenseCorrespondenceTraining(object):
             pixelwise_contrastive_loss.debug = True
             loss_function = pixelwise_contrastive_loss
         elif self._config['loss_function']['name'] == 'aploss':
-            inner_radius = self._config['loss_function']['inner_radius']
-            outter_radius =self._config['loss_function']['outter_radius']
-            num_samples =self._config['loss_function']['num_negative_samples']
-            sampler = RingSampler(inner_radius, outter_radius)
-            loss_function = PixelAPLoss(nq=25, sampler=sampler, num_negative_samples=num_samples) # nq hyperparam todo
+            loss_function_config = self._config['loss_function']
+            nq = loss_function_config['nq']
+            num_samples = loss_function_config['num_samples']
+            sampler = dispatch_sampler(loss_function_config['sampler'])
+
+            loss_function = PixelAPLoss(nq=nq, sampler=sampler, num_samples=num_samples)
             loss_function.cuda()
         else:
             raise ValueError("Couldn't find your loss_function: " + self._config['loss_function']['name'])
@@ -332,6 +334,11 @@ class DenseCorrespondenceTraining(object):
                 blind_non_matches_a = Variable(blind_non_matches_a.cuda().squeeze(0), requires_grad=False)
                 blind_non_matches_b = Variable(blind_non_matches_b.cuda().squeeze(0), requires_grad=False)
 
+                dataset_item = DatasetItem(
+                    match_type, img_a, img_b, matches_a, matches_b, masked_non_matches_a, masked_non_matches_b,
+                    background_non_matches_a, background_non_matches_b, blind_non_matches_a, blind_non_matches_b, metadata
+                )
+
                 optimizer.zero_grad()
                 self.adjust_learning_rate(optimizer, loss_current_iteration)
                 self.logger.log('learning rate', self.get_learning_rate(optimizer))
@@ -361,7 +368,7 @@ class DenseCorrespondenceTraining(object):
                     self.logger.log('blind_non_match_loss', blind_non_match_loss.item())
 
                 elif self._config['loss_function']['name'] == 'aploss':
-                    loss = loss_function(image_a_pred, image_b_pred, matches_a, matches_b)
+                    loss = loss_function(image_a_pred, image_b_pred, dataset_item)
                     self.logger.log('loss', loss.item())
 
                 loss.backward()
