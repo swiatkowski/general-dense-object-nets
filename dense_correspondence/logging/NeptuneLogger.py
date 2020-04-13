@@ -16,7 +16,7 @@ class NeptuneLogger(Logger):
         tags = logging_config['tags']
 
         self.api.init('{}/{}'.format(namespace, project))
-        self.api.create_experiment(name=experiment, description=description, tags=tags, params=config)
+        self.api.create_experiment(name=experiment, description=description, tags=tags)
 
     def send_logs(self):
         for metric, value, type in self.storage:
