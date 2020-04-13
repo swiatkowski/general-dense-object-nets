@@ -543,10 +543,10 @@ class DenseCorrespondenceTraining(object):
         print('Saving to params to file: ', network_param_file)
 
         torch.save(dcn.state_dict(), network_param_file)
-        self.logger.log('Model state', network_param_file, 'artifact')
+        self.logger.log('Model state', network_param_file, 'file')
 
         torch.save(optimizer.state_dict(), optimizer_param_file)
-        self.logger.log('Optimizer state', optimizer_param_file, 'artifact')
+        self.logger.log('Optimizer state', optimizer_param_file, 'file')
 
     def save_configs(self):
         """
@@ -556,11 +556,11 @@ class DenseCorrespondenceTraining(object):
         """
         training_params_file = os.path.join(self._logging_dir, 'training.yaml')
         utils.saveToYaml(self._config, training_params_file)
-        self.logger.log('Training config', training_params_file, 'artifact')
+        self.logger.log('Training config', training_params_file, 'file')
 
         dataset_params_file = os.path.join(self._logging_dir, 'dataset.yaml')
         utils.saveToYaml(self._dataset.config, dataset_params_file)
-        self.logger.log('Dataset config', dataset_params_file, 'artifact')
+        self.logger.log('Dataset config', dataset_params_file, 'file')
 
 
     def adjust_learning_rate(self, optimizer, iteration):

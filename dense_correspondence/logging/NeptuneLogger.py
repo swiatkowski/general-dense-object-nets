@@ -26,10 +26,10 @@ class NeptuneLogger(Logger):
                 self.api.log_text(metric, value)
             elif type == 'image':
                 self.api.log_image(metric, value)
-            elif type == 'artifact':
+            elif type == 'file':
                 self.api.log_artifact(value)
             else:
-                raise Exception("Metric type '{}' not recognized. Supported types are: [number, text, iamge, artifact]".format(type))
+                raise Exception("Metric type '{}' not recognized. Supported types are: [number, text, iamge, file]".format(type))
 
         self.clear()
 
