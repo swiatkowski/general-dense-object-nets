@@ -5,6 +5,17 @@ ARG USER_PASSWORD
 ARG USER_ID
 ARG USER_GID
 
+# Automatically select the closest ubuntu mirror
+RUN echo "deb mirror://mirrors.ubuntu.com/mirrors.txt xenial main restricted universe multiverse" > /etc/apt/sources.list && \
+    echo "deb mirror://mirrors.ubuntu.com/mirrors.txt xenial-updates main restricted universe multiverse" >> /etc/apt/sources.list && \
+    echo "deb mirror://mirrors.ubuntu.com/mirrors.txt xenial-security main restricted universe multiverse" >> /etc/apt/sources.list && \
+    DEBIAN_FRONTEND=noninteractive apt-get update
+# Select ICM mirror (untested)
+#RUN echo "deb http://ftp.icm.edu.pl/pub/Linux/ubuntu/ xenial main restricted universe multiverse" > /etc/apt/sources.list && \
+#    echo "deb http://ftp.icm.edu.pl/pub/Linux/ubuntu/ xenial-updates main restricted universe multiverse" >> /etc/apt/sources.list && \
+#    echo "deb http://ftp.icm.edu.pl/pub/Linux/ubuntu/ xenial-security main restricted universe multiverse" >> /etc/apt/sources.list && \
+#    DEBIAN_FRONTEND=noninteractive apt-get update
+
 RUN apt-get update
 RUN apt-get install sudo
 RUN useradd -ms /bin/bash $USER_NAME
@@ -19,6 +30,12 @@ RUN usermod -u $USER_ID $USER_NAME
 WORKDIR /home/$USER_NAME
 ENV USER_HOME_DIR=/home/$USER_NAME
 
+# Strangely these packages are getting connection timed out when installed together with other packages.
+RUN apt-get install -y --no-install-recommends libdrm2
+RUN apt-get install -y --no-install-recommends libva1
+RUN apt-get install -y --no-install-recommends python-gobject-2
+RUN apt-get install -y --no-install-recommends libpixman-1-0
+RUN apt-get install -y --no-install-recommends libasound2
 
 COPY ./install_dependencies.sh /tmp/install_dependencies.sh
 RUN yes "Y" | /tmp/install_dependencies.sh

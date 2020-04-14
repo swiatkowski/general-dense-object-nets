@@ -46,6 +46,8 @@ dense_correspondence_network:
     resnet_name: "Resnet34_8s"  # options: {Resnet34_8s, Resnet101_8s, etc.}
     # If Unet
     # currently no options supported
+  reliability: False
+  add_conv: True
 
 
 loss_function:
@@ -60,6 +62,11 @@ loss_function:
   scale_by_hard_negatives: True
   scale_by_hard_negatives_DIFFERENT_OBJECT: True
   alpha_triplet: 0.1
+  # Missing parameters for training with aploss.
+  # TODO: set up
+  inner_radius: 0
+  outter_radius: 0
+  num_negative_samples: 0
 
 logging:
   backend: 'neptune'
@@ -67,6 +74,7 @@ logging:
   project: 'general-dense-object-nets'
   experiment: 'shoes'
   description: 'This is example description'
+  qualitative_evaluation_logging_rate: 500
   tags: # list as many tags you want. They intend to help you search/filter experiemnts
     - 'general-dense-object-nets'
     - 'unknown_user'

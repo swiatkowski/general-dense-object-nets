@@ -42,6 +42,7 @@ from dense_correspondence.evaluation.evaluation import DenseCorrespondenceEvalua
 from dense_correspondence.evaluation.plotting import normalize_descriptor
 from dense_correspondence.logging.dispatcher import dispatch_logger
 
+from dense_correspondence.loss_functions.probabilistic_loss import ProbabilisticLoss
 
 class DenseCorrespondenceTraining(object):
 
@@ -271,6 +272,8 @@ class DenseCorrespondenceTraining(object):
 
             loss_function = PixelAPLoss(nq=nq, sampler=sampler, num_samples=num_samples)
             loss_function.cuda()
+        elif self._config['loss_function']['name'] == 'probabilistic_loss':
+            probabilistic_loss = ProbabilisticLoss(image_shape=dcn.image_shape, config=self._config['loss_function'])
         else:
             raise ValueError("Couldn't find your loss_function: " + self._config['loss_function']['name'])
 
@@ -293,6 +296,7 @@ class DenseCorrespondenceTraining(object):
         self._logging_dict['test'] = {"iteration": [], "loss": [], "match_loss": [],
                                            "non_match_loss": []}
 
+        # What is this for?
         # save network before starting
         if not use_pretrained:
             self.save_network(dcn, optimizer, 0)
@@ -344,23 +348,26 @@ class DenseCorrespondenceTraining(object):
                 self.logger.log('learning rate', self.get_learning_rate(optimizer))
 
                 # run both images through the network
-                image_a_pred_ = dcn.forward(img_a)
-                image_a_pred = dcn.process_network_output(image_a_pred_, batch_size)
+                image_a_pred_, reliability_a_ = dcn.forward(img_a)
+                image_a_pred, reliability_a = dcn.process_network_output(image_a_pred_, reliability_a_, batch_size)
 
-                image_b_pred_ = dcn.forward(img_b)
-                image_b_pred = dcn.process_network_output(image_b_pred_, batch_size)
-
+                image_b_pred_, reliability_b_ = dcn.forward(img_b)
+                image_b_pred, reliability_b = dcn.process_network_output(image_b_pred_, reliability_b_, batch_size)
 
                 # get loss
                 loss, match_loss, masked_non_match_loss, background_non_match_loss, blind_non_match_loss = 0, 0, 0, 0, 0
                 if self._config['loss_function']['name'] == 'pixelwise_contrastive_loss':
                     loss, match_loss, masked_non_match_loss, \
-                    background_non_match_loss, blind_non_match_loss = loss_composer.get_loss(pixelwise_contrastive_loss, match_type,
-                                                                                image_a_pred, image_b_pred,
-                                                                                matches_a,     matches_b,
-                                                                                masked_non_matches_a, masked_non_matches_b,
-                                                                                background_non_matches_a, background_non_matches_b,
-                                                                                blind_non_matches_a, blind_non_matches_b)
+                    background_non_match_loss, blind_non_match_loss = loss_composer.get_loss(pixelwise_contrastive_loss,
+                                                                                             match_type,
+                                                                                             image_a_pred, image_b_pred,
+                                                                                             matches_a, matches_b,
+                                                                                             masked_non_matches_a,
+                                                                                             masked_non_matches_b,
+                                                                                             background_non_matches_a,
+                                                                                             background_non_matches_b,
+                                                                                             blind_non_matches_a,
+                                                                                             blind_non_matches_b)
                     self.logger.log('loss', loss.item())
                     self.logger.log('match_loss', match_loss.item())
                     self.logger.log('masked_non_match_loss', masked_non_match_loss.item())
@@ -370,6 +377,19 @@ class DenseCorrespondenceTraining(object):
                 elif self._config['loss_function']['name'] == 'aploss':
                     loss = loss_function(image_a_pred, image_b_pred, dataset_item)
                     self.logger.log('loss', loss.item())
+
+                elif self._config['loss_function']['name'] == 'probabilistic_loss':
+                    loss = probabilistic_loss.get_loss(match_type,
+                                                       image_a_pred, image_b_pred,
+                                                       reliability_a, reliability_b,
+                                                       matches_a, matches_b,
+                                                       masked_non_matches_a, masked_non_matches_b,
+                                                       background_non_matches_a, background_non_matches_b,
+                                                       blind_non_matches_a, blind_non_matches_b)
+                    self.logger.log('loss', loss.item())
+
+                else:
+                    raise NotImplementedError('loss function')
 
                 loss.backward()
                 optimizer.step()
@@ -448,9 +468,9 @@ class DenseCorrespondenceTraining(object):
                     for e, _ in evaluations['test_evals']:
                         self.logger.log('Test eval - iter {}'.format(i), e * 255.0, 'image')
 
-
                 # don't compute the test loss on the first few times through the loop
-                if self._config["training"]["compute_test_loss"] and (loss_current_iteration % compute_test_loss_rate == 0) and loss_current_iteration > 5:
+                if self._config["training"]["compute_test_loss"] and (loss_current_iteration % compute_test_loss_rate
+                                                                      == 0) and loss_current_iteration > 5:
                     logging.info("Computing test loss")
 
                     # delete the loss, match_loss, non_match_loss variables so that
@@ -479,7 +499,8 @@ class DenseCorrespondenceTraining(object):
 
                 if loss_current_iteration > max_num_iterations:
                     logging.info("Finished testing after %d iterations" % (max_num_iterations))
-                    self.save_network(dcn, optimizer, loss_current_iteration, logging_dict=self._logging_dict)
+                    self.save_network(dcn, optimizer, loss_current_iteration, logging_dict=self._logging_dict,
+                                      last_only=False)
                     self.logger.exit()
                     return
 

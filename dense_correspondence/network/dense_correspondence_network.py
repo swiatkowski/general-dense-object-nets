@@ -12,6 +12,7 @@ from PIL import Image
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torchvision import transforms
 import pytorch_segmentation_detection.models.resnet_dilated as resnet_dilated
 from dense_correspondence.dataset.spartan_dataset_masked import SpartanDataset
@@ -250,15 +251,18 @@ class DenseCorrespondenceNetwork(nn.Module):
         :rtype:
         """
 
+        # print self.fcn
+        if hasattr(self.fcn, 'num_outputs') and self.fcn.num_outputs == 2:
+            return self.fcn(img_tensor)
+
         res = self.fcn(img_tensor)
+        #TODO: add eps
         if self._normalize:
             #print "normalizing descriptor norm"
             norm = torch.norm(res, 2, 1) # [N,1,H,W]
             res = res/norm
 
-
-
-        return res
+        return res, None
 
     def forward_single_image_tensor(self, img_tensor):
         """
@@ -284,21 +288,23 @@ class DenseCorrespondenceNetwork(nn.Module):
         img_tensor = torch.tensor(img_tensor, device=torch.device("cuda"))
 
 
-        res = self.forward(img_tensor) # shape [1,D,H,W]
+        res, reliability_map = self.forward(img_tensor) # shape [1,D,H,W]
         # print "res.shape 1", res.shape
 
 
         res = res.squeeze(0) # shape [D,H,W]
+        if reliability_map is not None:
+            reliability_map = reliability_map.squeeze(0)
         # print "res.shape 2", res.shape
 
         res = res.permute(1,2,0) # shape [H,W,D]
         # print "res.shape 3", res.shape
 
-        return res
+        return res, reliability_map
 
 
 
-    def process_network_output(self, image_pred, N):
+    def process_network_output(self, image_pred, reliability_map, N):
         """
         Processes the network output into a new shape
 
@@ -314,7 +320,9 @@ class DenseCorrespondenceNetwork(nn.Module):
         H = self._image_height
         image_pred = image_pred.view(N, self.descriptor_dimension, W * H)
         image_pred = image_pred.permute(0, 2, 1)
-        return image_pred
+        if reliability_map is not None:
+            reliability_map = reliability_map.view(N, W * H)
+        return image_pred, reliability_map
 
     def clip_pixel_to_image_size_and_round(self, uv):
         """
@@ -370,11 +378,12 @@ class DenseCorrespondenceNetwork(nn.Module):
 
         if config["backbone"]["model_class"] == "Resnet":
             resnet_model = config["backbone"]["resnet_name"]
-            fcn = getattr(resnet_dilated, resnet_model)(num_classes=config['descriptor_dimension'])
-
+            if config["reliability"]:
+                fcn = ReliabilitySoftplus(resnet_model, config['descriptor_dimension'], config["add_conv"])
+            else:
+                fcn = getattr(resnet_dilated, resnet_model)(num_classes=config['descriptor_dimension'])
         elif config["backbone"]["model_class"] == "Unet":
             fcn = DenseCorrespondenceNetwork.get_unet(config)
-
         else:
             raise ValueError("Can't build backbone network.  I don't know this backbone model class!")
 
@@ -575,3 +584,29 @@ class DenseCorrespondenceNetwork(nn.Module):
         # cast to float32, need this in order to use cv2.BFMatcher() with bf.knnMatch
         des = np.array(des, dtype=np.float32)
         return des
+
+
+class ReliabilitySoftplus(nn.Module):
+    def __init__(self, resnet_model, descriptor_dimension, add_conv=False):
+        super(ReliabilitySoftplus, self).__init__()
+        if add_conv:
+            self.resnet = getattr(resnet_dilated, resnet_model)(descriptor_dimension)
+            self.reliability_layer = nn.Conv2d(in_channels=descriptor_dimension, out_channels=1, kernel_size=1)
+            self.resnet._normal_initialization(self.reliability_layer)
+        else:
+            self.resnet = getattr(resnet_dilated, resnet_model)(descriptor_dimension + 1)
+        self._descriptor_dimension = descriptor_dimension
+        self._add_conv = add_conv
+        self.num_outputs = 2
+
+    def forward(self, x):
+        x = self.resnet.forward(x)
+        if self._add_conv:
+            descriptors_output = x
+            reliability_output = self.reliability_layer(x)
+        else:
+            descriptors_output, reliability_output = torch.split(x, split_size_or_sections=self._descriptor_dimension,
+                                                                 dim=1)
+        descriptors_output = F.normalize(descriptors_output, p=2, dim=1)
+        reliability_output = F.softplus(reliability_output).clamp(min=1e-2)
+        return descriptors_output, reliability_output
