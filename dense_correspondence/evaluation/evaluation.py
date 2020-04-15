@@ -1391,14 +1391,17 @@ class DenseCorrespondenceEvaluation(object):
         res_b, reliability_b = dcn.forward_single_image_tensor(rgb_b_tensor)
         res_a = res_a.data.cpu().numpy()
         res_b = res_b.data.cpu().numpy()
-        reliability_a = reliability_a.data.cpu().numpy()
-        reliability_b = reliability_b.data.cpu().numpy()
+        if reliability_a is not None:
+            reliability_a = reliability_a.data.cpu().numpy()
+            reliability_b = reliability_b.data.cpu().numpy()
 
         # sample points on img_a. Compute best matches on img_b
         # note that this is in (x,y) format
         # TODO: if this mask is empty, this function will not be happy
         # de-prioritizing since this is only for qualitative evaluation plots
         sampled_idx_list = random_sample_from_masked_image(mask_a, num_matches)
+        if len(sampled_idx_list) == 0:
+            return None
 
         # list of cv2.KeyPoint
         kp1 = []
@@ -2121,7 +2124,7 @@ class DenseCorrespondenceEvaluation(object):
 
     @staticmethod
     def combine_qualitative_evaluations(evaluations):
-        return [DenseCorrespondenceEvaluation.combine_qualitative_evaluation(evaluation) for evaluation in evaluations]
+        return [DenseCorrespondenceEvaluation.combine_qualitative_evaluation(evaluation) for evaluation in evaluations if evaluation[0] is not None]
 
     @staticmethod
     def combine_qualitative_evaluation(evaluation):
@@ -2137,15 +2140,15 @@ class DenseCorrespondenceEvaluation(object):
         nd2 = data.descriptor_colormaps.normalized_descriptor2
         mnd1 = data.descriptor_colormaps.masked_normalized_descriptor1
         mnd2 = data.descriptor_colormaps.masked_normalized_descriptor2
-        rel1 = data.reliability_maps.reliability1
-        rel2 = data.reliability_maps.reliability2
 
         combined = np.concatenate((nd1, nd2), axis=1)
         if mnd1 is not None:
             combined_masked_descriptors = np.concatenate((mnd1, mnd2), axis=1)
             combined = np.concatenate((combined, combined_masked_descriptors), axis=0)
 
-        if rel1 is not None:
+        if data.reliability_maps is not None:
+            rel1 = data.reliability_maps.reliability1
+            rel2 = data.reliability_maps.reliability2
             combined_reliability_maps = np.concatenate((rel1, rel2), axis=1)
             combined = np.concatenate((combined, combined_reliability_maps), axis=0)
 

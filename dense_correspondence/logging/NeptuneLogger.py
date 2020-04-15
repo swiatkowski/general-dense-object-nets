@@ -17,6 +17,13 @@ class NeptuneLogger(Logger):
 
         self.api.init('{}/{}'.format(namespace, project))
         self.api.create_experiment(name=experiment, description=description, tags=tags)
+        self.append_tags_from_config(config)
+
+    def append_tags_from_config(self, config):
+        loss_function_config = config['loss_function']
+        loss_name = loss_function_config['name']
+        sampler_name = loss_function_config['sampler']['name']
+        self.api.append_tag([loss_name, '{}-sampler'.format(sampler_name)])
 
     def send_logs(self):
         for metric, value, type in self.storage:
