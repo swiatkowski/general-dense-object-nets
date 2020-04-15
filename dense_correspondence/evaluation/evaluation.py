@@ -555,7 +555,7 @@ class DenseCorrespondenceEvaluation(object):
 
     @staticmethod
     def plot_descriptor_colormaps(res_a, res_b, descriptor_image_stats=None,
-                                  mask_a=None, mask_b=None, plot_masked=False, descriptor_norm_type="mask_image"):
+                                  mask_a=None, mask_b=None, plot_masked=False, descriptor_norm_type="mask_image", output_is_normalized=True):
         """
         Plots the colormaps of descriptors for a pair of images
         :param res_a: descriptors for img_a
@@ -568,7 +568,13 @@ class DenseCorrespondenceEvaluation(object):
         :return: None
         :rtype: None
         """
-        if descriptor_image_stats is None:
+        if output_is_normalized:
+            # you may wonder why to perfrm `dc_plotting.normalize_descriptor` when `output_is_normalized=True`
+            # because "dc_plotting.normalize_descriptor" encodes values [a ,b] -> [0, 1] range for plotting
+            # `output_is_normalized=True` means that descriptor is normalized in L2 sense so values are in [-1, 1] range
+            res_a_norm = dc_plotting.normalize_descriptor(res_a, {'min': -1.0, 'max': 1.0})
+            res_b_norm = dc_plotting.normalize_descriptor(res_b, {'min': -1.0, 'max': 1.0})
+        elif descriptor_image_stats is None:
             res_a_norm, res_b_norm = dc_plotting.normalize_descriptor_pair(res_a, res_b)
         else:
             res_a_norm = dc_plotting.normalize_descriptor(res_a, descriptor_image_stats[descriptor_norm_type])
@@ -1217,7 +1223,7 @@ class DenseCorrespondenceEvaluation(object):
 
     @staticmethod
     def single_same_scene_image_pair_qualitative_analysis(dcn, dataset, scene_name, img_a_idx, img_b_idx,
-                                                          num_matches=10):
+                                                          num_matches=10, output_is_normalized=True):
         """
         Wrapper for single_image_pair_qualitative_analysis, when images are from same scene.
 
@@ -1239,7 +1245,7 @@ class DenseCorrespondenceEvaluation(object):
         rgb_b, _, mask_b, _ = dataset.get_rgbd_mask_pose(scene_name, img_b_idx)
 
         return DenseCorrespondenceEvaluation.single_image_pair_qualitative_analysis(dcn, dataset, rgb_a, rgb_b, mask_a,
-                                                                                    mask_b, num_matches)
+                                                                                    mask_b, num_matches, output_is_normalized=output_is_normalized)
 
     @staticmethod
     def single_cross_scene_image_pair_qualitative_analysis(dcn, dataset, scene_name_a,
@@ -1359,7 +1365,7 @@ class DenseCorrespondenceEvaluation(object):
         return rgb_a, rgb_b
 
     @staticmethod
-    def single_image_pair_qualitative_analysis(dcn, dataset, rgb_a, rgb_b, mask_a, mask_b, num_matches):
+    def single_image_pair_qualitative_analysis(dcn, dataset, rgb_a, rgb_b, mask_a, mask_b, num_matches, output_is_normalized=True):
         """
         Computes qualtitative assessment of DCN performance for a pair of
         images
@@ -1391,9 +1397,6 @@ class DenseCorrespondenceEvaluation(object):
         res_b, reliability_b = dcn.forward_single_image_tensor(rgb_b_tensor)
         res_a = res_a.data.cpu().numpy()
         res_b = res_b.data.cpu().numpy()
-        if reliability_a is not None:
-            reliability_a = reliability_a.data.cpu().numpy()
-            reliability_b = reliability_b.data.cpu().numpy()
 
         # sample points on img_a. Compute best matches on img_b
         # note that this is in (x,y) format
@@ -1442,9 +1445,13 @@ class DenseCorrespondenceEvaluation(object):
                                                                                         descriptor_image_stats=descriptor_image_stats,
                                                                                         mask_a=mask_a,
                                                                                         mask_b=mask_b,
-                                                                                        plot_masked=True)
+                                                                                        plot_masked=True,
+                                                                                        output_is_normalized=output_is_normalized)
 
         if reliability_a is not None:
+            reliability_a = reliability_a.data.cpu().numpy()
+            reliability_b = reliability_b.data.cpu().numpy()
+
             reliability_a, reliability_b = DenseCorrespondenceEvaluation.plot_reliability_maps(
                 reliability_a, reliability_b, np.shape(res_a)[2])
             reliability_maps = ReliabilityMap(reliability_a, reliability_b)
@@ -1981,10 +1988,10 @@ class DenseCorrespondenceEvaluation(object):
         return scene_names, img_pairs
 
     @staticmethod
-    def evaluate_network_qualitative(dcn, dataset, num_image_pairs=5, randomize=False, scene_type=None):
+    def evaluate_network_qualitative(dcn, dataset, num_image_pairs=5, randomize=False, scene_type=None, output_is_normalized=True):
         results = DenseCorrespondenceEvaluation.evaluate_network_qualitative_without_plotting(dcn, dataset,
                                                                                               num_image_pairs,
-                                                                                              randomize, scene_type)
+                                                                                              randomize, scene_type, output_is_normalized=output_is_normalized)
 
         print "\n\n-----------Train Data Evaluation----------------"
         train_evals = results['train_evals']
@@ -2015,7 +2022,7 @@ class DenseCorrespondenceEvaluation(object):
 
     @staticmethod
     def evaluate_network_qualitative_without_plotting(dcn, dataset, num_image_pairs=5, randomize=False,
-                                                      scene_type=None):
+                                                      scene_type=None, output_is_normalized=True):
         dcn.eval()
         # Train Data
         if randomize:
@@ -2047,7 +2054,8 @@ class DenseCorrespondenceEvaluation(object):
                                                                                                   dataset,
                                                                                                   scene_name,
                                                                                                   img_pair[0],
-                                                                                                  img_pair[1])
+                                                                                                  img_pair[1],
+                                                                                                  output_is_normalized=output_is_normalized)
             train_results.append((res, comment))
 
         train_evals = DenseCorrespondenceEvaluation.combine_qualitative_evaluations(train_results)
@@ -2083,7 +2091,8 @@ class DenseCorrespondenceEvaluation(object):
                                                                                                   dataset,
                                                                                                   scene_name,
                                                                                                   img_pair[0],
-                                                                                                  img_pair[1])
+                                                                                                  img_pair[1],
+                                                                                                  output_is_normalized=output_is_normalized)
             test_results.append((res, comment))
 
         test_evals = DenseCorrespondenceEvaluation.combine_qualitative_evaluations(test_results)
@@ -2109,7 +2118,8 @@ class DenseCorrespondenceEvaluation(object):
                                                                                                       dataset,
                                                                                                       scene_name,
                                                                                                       img_pair[0],
-                                                                                                      img_pair[1])
+                                                                                                      img_pair[1],
+                                                                                                      output_is_normalized=output_is_normalized)
                 test_results.append((res, comment))
 
             caterpillar_test_evals = DenseCorrespondenceEvaluation.combine_qualitative_evaluations(
@@ -2715,7 +2725,7 @@ class DenseCorrespondenceEvaluation(object):
 
         DenseCorrespondenceEvaluation.single_same_scene_image_pair_qualitative_analysis(dcn, dataset,
                                                                                         scene_name, img_idx_a,
-                                                                                        img_idx_b)
+                                                                                        img_idx_b, normalize=True)
 
 
 class DenseCorrespondenceEvaluationPlotter(object):

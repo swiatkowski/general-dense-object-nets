@@ -296,10 +296,6 @@ class DenseCorrespondenceTraining(object):
         self._logging_dict['test'] = {"iteration": [], "loss": [], "match_loss": [],
                                            "non_match_loss": []}
 
-        # What is this for?
-        # save network before starting
-        if not use_pretrained:
-            self.save_network(dcn, optimizer, 0)
 
         total_time = time.time()
         for epoch in range(50):  # loop over the dataset multiple times
@@ -462,7 +458,8 @@ class DenseCorrespondenceTraining(object):
                     self.save_network(dcn, optimizer, loss_current_iteration, logging_dict=self._logging_dict, last_only=True)
 
                 if i % self._config["logging"]["qualitative_evaluation_logging_rate"] == 0:
-                    evaluations = DCE.evaluate_network_qualitative_without_plotting(dcn, dataset=self.dataset, randomize=True)
+                    output_is_normalized = not self._config['dense_correspondence_network']['normalize']
+                    evaluations = DCE.evaluate_network_qualitative_without_plotting(dcn, dataset=self.dataset, randomize=True, output_is_normalized=output_is_normalized)
                     for e, _ in evaluations['train_evals']:
                         self.logger.log('Train eval - iter {}'.format(i), e * 255.0, 'image')
                     for e, _ in evaluations['test_evals']:
