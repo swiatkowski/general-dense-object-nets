@@ -24,7 +24,7 @@ class NeptuneLogger(Logger):
         loss_name = loss_function_config['name']
         self.api.append_tag([loss_name])
 
-        if loss_function_config['sampler']['name'] is not None:
+        if loss_function_config['sampler'] is not None:
             sampler_name = loss_function_config['sampler']['name']
             self.api.append_tag(['{}-sampler'.format(sampler_name)])
 
