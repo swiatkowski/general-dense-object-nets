@@ -94,9 +94,6 @@ class PixelAPLoss(nn.Module):
         matches_1 = matches_1.unsqueeze(-1)
         matches_2 = matches_2.unsqueeze(-1)
 
-        # descriptors1 = F.normalize(descriptors1, p=2, dim=-1)
-        # descriptors2 = F.normalize(descriptors2, p=2, dim=-1)
-
         positive_scores = self.compute_scores(descriptors1, descriptors2, matches_1, matches_2)
         negative_scores = self.compute_scores(descriptors1, descriptors2, matches_1, non_matches_2)
         scores, ground_truth = self.combine_scores(positive_scores, negative_scores)
