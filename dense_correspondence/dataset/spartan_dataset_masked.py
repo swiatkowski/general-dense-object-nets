@@ -1,6 +1,7 @@
 from dense_correspondence_dataset_masked import DenseCorrespondenceDataset, ImageType
 
 import os
+from collections import namedtuple
 import numpy as np
 import logging
 import glob
@@ -26,7 +27,7 @@ import dense_correspondence.correspondence_tools.correspondence_augmentation as 
 
 from dense_correspondence.dataset.scene_structure import SceneStructure
 
-
+DatasetItem = namedtuple('DatasetPoint', ['match_type', 'img_a', 'img_b', 'matches_a', 'matches_b', 'masked_non_matches_a', 'masked_non_matches_b', 'background_non_matches_a', 'background_non_matches_b', 'blind_non_matches_a', 'blind_non_matches_b', 'metadata'])
 
 class SpartanDatasetDataType:
     SINGLE_OBJECT_WITHIN_SCENE = 0

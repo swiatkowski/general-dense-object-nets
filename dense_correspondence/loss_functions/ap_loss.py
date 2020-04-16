@@ -60,11 +60,11 @@ class PixelAPLoss(nn.Module):
     """
     Computes the pixel-wise AP loss
     """
-    def __init__(self, nq=20, sampler=None, num_negative_samples=80):
+    def __init__(self, nq=20, sampler=None, num_samples=80):
         nn.Module.__init__(self)
         self.aploss = APLoss(nq, min=0, max=1)
         self.sampler = sampler
-        self.num_negative_samples = num_negative_samples
+        self.num_samples = num_samples
 
     def compute_scores(self, descriptors1, descriptors2, indices_1, indices_2):
         selected_descriptors_1 = descriptors1[:, indices_1, :]
@@ -87,18 +87,12 @@ class PixelAPLoss(nn.Module):
         ground_truth[:, :, :positive_scores.shape[2]] = 1
         return scores, ground_truth
 
+    def forward(self, descriptors1, descriptors2, dataset_item):
+        matches_1, matches_2 = dataset_item.matches_a, dataset_item.matches_b
+        non_matches_2 = self.sampler.get_samples(self.num_samples, dataset_item)
 
-    def get_indieces_from_points_and_offsets(self, matches, offsets):
-        offsetted_points = matches[:,None] + offsets
-        return offsetted_points.clamp(0, 480 * 640 - 1)
-
-    def forward(self, descriptors1, descriptors2, matches_1, matches_2):
-        non_matches_2 = self.get_indieces_from_points_and_offsets(matches_2, self.sampler.get_samples(self.num_negative_samples))
         matches_1 = matches_1.unsqueeze(-1)
         matches_2 = matches_2.unsqueeze(-1)
-
-        descriptors1 = F.normalize(descriptors1, p=2, dim=-1)
-        descriptors2 = F.normalize(descriptors2, p=2, dim=-1)
 
         positive_scores = self.compute_scores(descriptors1, descriptors2, matches_1, matches_2)
         negative_scores = self.compute_scores(descriptors1, descriptors2, matches_1, non_matches_2)
@@ -113,38 +107,3 @@ class PixelAPLoss(nn.Module):
         # 1 - ap_score * rel
         ap_loss = 1 - ap_score
         return ap_loss.mean()
-
-
-# this class is inspired by Ngh2Sampler from https://github.com/naver/r2d2/blob/master/nets/sampler.py
-class RingSampler(nn.Module):
-    """
-    Class for sampling non-correspondence.
-    Points are being drawn from the ring around true match
-    Radius is defined in pixel units.
-    """
-    def __init__(self, inner_radius=10, outter_radius=12):
-        nn.Module.__init__(self)
-        self.inner_radius = inner_radius
-        self.outter_radius = outter_radius
-        self.sample_offsets()
-
-    def sample_offsets(self, image_width=640):
-        inner_r2 = self.inner_radius**2
-        outer_r2 = self.outter_radius**2
-        neg = []
-        for j in range(-self.outter_radius-1, self.outter_radius+1):
-            for i in range(-self.outter_radius-1, self.outter_radius+1):
-                d2 = i*i + j*j
-                if inner_r2 <= d2 <= outer_r2:
-                    neg.append(i * image_width + j)
-
-        self.register_buffer('negative_offsets', torch.LongTensor(neg))
-
-    def get_samples(self, num_samples=None):
-        if num_samples is None:
-            return self.negative_offsets
-        if num_samples < 0:
-            raise Exception('Number of samples must be positive')
-        num_offsets = len(self.negative_offsets)
-        indices = torch.randperm(num_offsets)[:num_samples]
-        return self.negative_offsets[indices]

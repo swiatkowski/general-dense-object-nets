@@ -65,10 +65,33 @@ You can access the Jupyter and Tensorboard running on the Entropy cluster by set
 ssh -N -L 8888:localhost:8888 <user>@entropy.mimuw.edu.pl
 ```
 
-TODO(swiatkowski): TensorBoard files are exported. Add commands to access Tensorboard over SSH tunnel.
-
 For additional information refer to the document with the project description:
 https://docs.google.com/document/d/1Cq5LK8KdpZXHa9k9BCUp3NHovZnRnwo60e0jzbM_y18/edit?usp=sharing
+
+## AP Loss
+In training config file add some metadata for AP Loss and it's sampling strategy. Example:
+```yaml
+loss_function:
+  name: 'aploss'
+  nq: 25
+  num_samples: 150
+  sampler:
+    name: 'random' # choice: {'don', 'ring', 'random'}
+```
+
+Some sampling strategies require additional params (ex `ring` startegy)
+```yaml
+loss_function:
+  name: 'aploss'
+  nq: 25
+  num_samples: 150
+  sampler:
+    name: 'ring' # choice: {'don', 'ring', 'random'}
+    inner_radius: 20
+    outter_radius: 30
+```
+
+or
 
 ## Logging
 Currently we support logging to Neptune. Sign up here https://neptune.ai/.

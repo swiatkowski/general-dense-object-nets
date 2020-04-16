@@ -16,7 +16,17 @@ class NeptuneLogger(Logger):
         tags = logging_config['tags']
 
         self.api.init('{}/{}'.format(namespace, project))
-        self.api.create_experiment(name=experiment, description=description, tags=tags, params=config)
+        self.api.create_experiment(name=experiment, description=description, tags=tags)
+        self.append_tags_from_config(config)
+
+    def append_tags_from_config(self, config):
+        loss_function_config = config['loss_function']
+        loss_name = loss_function_config['name']
+        self.api.append_tag([loss_name])
+
+        if loss_function_config['sampler'] is not None:
+            sampler_name = loss_function_config['sampler']['name']
+            self.api.append_tag(['{}-sampler'.format(sampler_name)])
 
     def send_logs(self):
         for metric, value, type in self.storage:
@@ -26,10 +36,10 @@ class NeptuneLogger(Logger):
                 self.api.log_text(metric, value)
             elif type == 'image':
                 self.api.log_image(metric, value)
-            elif type == 'artifact':
+            elif type == 'file':
                 self.api.log_artifact(value)
             else:
-                raise Exception("Metric type '{}' not recognized. Supported types are: [number, text, iamge, artifact]".format(type))
+                raise Exception("Metric type '{}' not recognized. Supported types are: [number, text, iamge, file]".format(type))
 
         self.clear()
 
