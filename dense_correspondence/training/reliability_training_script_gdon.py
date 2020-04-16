@@ -30,13 +30,16 @@ train_config_file = os.path.join(utils.getDenseCorrespondenceSourceDir(), 'confi
 train_config = utils.getDictFromYamlFilename(train_config_file)
 dataset = SpartanDataset(config=config)
 
-# probabilistic
-train_config["loss_function"]["name"] = "probabilistic_loss"
+# Private account
 train_config["logging"]["namespace"] = "jkopanski"
-train_config["logging"]["experiment"] = "caterpillar"
-train_config["logging"]["description"] = "probabilistic_loss_add_conv_softplus_lr1e-3"
-train_config["logging"]["tags"] = ['general-dense-object-nets', 'jkopanski', 'probabilistic_loss']
-train_config["logging"]["qualitative_evaluation_logging_rate"] = 500
+
+# probabilistic
+# train_config["loss_function"]["name"] = "probabilistic_loss"
+# train_config["logging"]["namespace"] = "jkopanski"
+# train_config["logging"]["experiment"] = "caterpillar"
+# train_config["logging"]["description"] = "probabilistic_loss_add_conv_softplus_lr1e-3"
+# train_config["logging"]["tags"] = ['general-dense-object-nets', 'jkopanski', 'probabilistic_loss']
+# train_config["logging"]["qualitative_evaluation_logging_rate"] = 500
 
 # pixelwise_contrastive_loss
 # train_config["loss_function"]["name"] = "pixelwise_contrastive_loss"
@@ -46,11 +49,10 @@ train_config["logging"]["qualitative_evaluation_logging_rate"] = 500
 # train_config["logging"]["tags"] = ['general-dense-object-nets', 'jkopanski', 'pixelwise_contrastive_loss']
 
 # aploss
-# train_config["loss_function"]["name"] = "aploss"
-# train_config["logging"]["namespace"] = "jkopanski"
-# train_config["logging"]["experiment"] = "caterpillar"
-# train_config["logging"]["description"] = "aploss"
-# train_config["logging"]["tags"] = ['general-dense-object-nets', 'jkopanski', 'aploss']
+train_config["loss_function"]["name"] = "aploss"
+train_config["logging"]["experiment"] = "caterpillar"
+train_config["logging"]["description"] = "aploss"
+train_config["logging"]["tags"] = ['general-dense-object-nets', 'jkopanski', 'aploss']
 
 # Common for all loss functions
 train_config["dense_correspondence_network"]["reliability"] = True
@@ -62,7 +64,7 @@ train_config["training"]["logging_dir_name"] = "{}_{}_{}".format(
 # train_config["training"]["logging_dir"] = os.path.join(os.environ['HOME'], 'models', 'trained_models')
 train_config["training"]["logging_dir"] = 'trained_models'
 train_config["training"]["num_iterations"] = 5000
-train_config["training"]["learning_rate"] = 1e-3
+train_config["training"]["learning_rate"] = 1e-4
 
 TRAIN = True
 EVALUATE = True
