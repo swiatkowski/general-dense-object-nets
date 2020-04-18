@@ -249,6 +249,8 @@ class DenseCorrespondenceNetwork(nn.Module):
         res = self.fcn(img_tensor)
         # TODO: add eps
         if self._normalize:
+            assert 'head' not in self.config or 'class' not in self.config['head'] or \
+                   self.config['head']['class'] not in ['R2D2Net', 'ReliabilitySoftplus']
             # print "normalizing descriptor norm"
             norm = torch.norm(res, 2, 1)  # [N,1,H,W]
             res = res / norm
@@ -376,7 +378,6 @@ class DenseCorrespondenceNetwork(nn.Module):
         elif config['head']['class'] == 'R2D2Net':
             fcn = R2D2Net(config["backbone"]["resnet_name"], config['descriptor_dimension'])
 
-        print('Neural network model:\n', fcn)
         return fcn
 
     @staticmethod
@@ -605,5 +606,5 @@ class R2D2Net(nn.Module):
         x = self.resnet.forward(x)
         descriptors_output = F.normalize(x, p=2, dim=1)
         reliability_output = self.reliability_layer(x ** 2)
-        reliability_output = F.softmax(reliability_output, dim=1)
+        reliability_output = F.softmax(reliability_output, dim=1)[:,1:2]
         return descriptors_output, reliability_output

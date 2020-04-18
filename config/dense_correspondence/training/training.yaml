@@ -39,7 +39,7 @@ dense_correspondence_network:
   descriptor_dimension: 3
   image_width: 640
   image_height: 480
-  normalize: False
+  normalize: False  # currently meaningful only for network without head
   backbone:
     model_class: "Resnet"         # options: {Resnet, Unet}
     # If Resnet
@@ -47,11 +47,8 @@ dense_correspondence_network:
     # If Unet
     # currently no options supported
   head:
-    class: 'R2D2Net'
-    add_conv: True
-#  reliability: False
-#  add_conv: True
-
+    class: 'R2D2Net'  # options: {None, R2D2Net, ReliabilitySoftplus}
+    add_conv: True    # This is an additional option for ReliabilitySoftplus net
 
 loss_function:
   name: 'aploss'  # pixelwise_contrastive_loss

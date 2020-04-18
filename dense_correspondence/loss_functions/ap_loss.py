@@ -61,6 +61,7 @@ class PixelAPLoss(nn.Module):
     Computes the pixel-wise AP loss
     """
     def __init__(self, nq=20, sampler=None, num_samples=80, kappa=0):
+        assert 0 <= kappa <= 1
         nn.Module.__init__(self)
         self.aploss = APLoss(nq, min=0, max=1)
         self.sampler = sampler
@@ -115,6 +116,8 @@ class PixelAPLoss(nn.Module):
         if reliability1 is None or reliability2 is None:
             ap_loss = 1 - ap_score
         else:
+            reliability1 = reliability1[:, dataset_item.matches_a]
+            reliability2 = reliability2[:, dataset_item.matches_b]
             average_reliability = (reliability1 + reliability2) / 2
             ap_loss = 1 - ap_score * average_reliability + self._kappa * (1 - average_reliability)
         return ap_loss.mean()

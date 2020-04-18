@@ -31,7 +31,7 @@ train_config = utils.getDictFromYamlFilename(train_config_file)
 dataset = SpartanDataset(config=config)
 
 # Private account
-train_config["logging"]["namespace"] = "jkopanski"
+# train_config["logging"]["namespace"] = "jkopanski"
 
 # probabilistic
 # train_config["loss_function"]["name"] = "probabilistic_loss"
@@ -51,7 +51,7 @@ train_config["logging"]["namespace"] = "jkopanski"
 # aploss
 train_config["loss_function"]["name"] = "aploss"
 train_config["logging"]["experiment"] = "caterpillar"
-train_config["logging"]["description"] = "aploss"
+train_config["logging"]["description"] = 'aploss_reliability'
 train_config["logging"]["tags"] = ['general-dense-object-nets', 'jkopanski', 'aploss']
 
 # Common for all loss functions
