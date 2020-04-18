@@ -103,4 +103,4 @@ class DONSampler(Sampler):
 
         non_matches = torch.cat([masked_non_matches, background_non_matches], dim=-1)
         random_indices = torch.randint(0, non_matches.shape[1], (num_samples,))
-        return non_matches_2[:, random_indices]
+        return non_matches[:, random_indices]

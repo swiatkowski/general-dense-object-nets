@@ -360,7 +360,8 @@ class DenseCorrespondenceNetwork(nn.Module):
 
         """
 
-        if 'head' not in config or config['head']['class'] == 'None':
+        if 'head' not in config or 'class' not in config['head'] \
+                or config['head']['class'] is None or config['head']['class'] == 'None':
             if config["backbone"]["model_class"] == "Resnet":
                 resnet_model = config["backbone"]["resnet_name"]
                 fcn = getattr(resnet_dilated, resnet_model)(num_classes=config['descriptor_dimension'])
@@ -375,6 +376,7 @@ class DenseCorrespondenceNetwork(nn.Module):
         elif config['head']['class'] == 'R2D2Net':
             fcn = R2D2Net(config["backbone"]["resnet_name"], config['descriptor_dimension'])
 
+        print('Neural network model:\n', fcn)
         return fcn
 
     @staticmethod
