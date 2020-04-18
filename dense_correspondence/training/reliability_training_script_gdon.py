@@ -55,7 +55,7 @@ train_config["logging"]["description"] = "aploss"
 train_config["logging"]["tags"] = ['general-dense-object-nets', 'jkopanski', 'aploss']
 
 # Common for all loss functions
-train_config["dense_correspondence_network"]["reliability"] = True
+# train_config["dense_correspondence_network"]["reliability"] = True
 train_config["dense_correspondence_network"]["descriptor_dimension"] = 3
 train_config["training"]["logging_dir_name"] = "{}_{}_{}".format(
     train_config["logging"]["experiment"],
