@@ -10,9 +10,6 @@ from dense_correspondence.training.training import *
 import logging
 import os
 
-# utils.set_default_cuda_visible_devices()
-utils.set_cuda_visible_devices([0])  # use this to manually set CUDA_VISIBLE_DEVICES
-
 from dense_correspondence.training.training import DenseCorrespondenceTraining
 from dense_correspondence.dataset.spartan_dataset_masked import SpartanDataset
 
@@ -51,7 +48,7 @@ dataset = SpartanDataset(config=config)
 # aploss
 train_config["loss_function"]["name"] = "aploss"
 train_config["logging"]["experiment"] = "caterpillar"
-train_config["logging"]["description"] = 'aploss_reliability'
+train_config["logging"]["description"] = 'aploss_reliability_4'
 train_config["logging"]["tags"] = ['general-dense-object-nets', 'jkopanski', 'aploss']
 
 # Common for all loss functions

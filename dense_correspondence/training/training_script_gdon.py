@@ -9,9 +9,6 @@ import sys
 import logging
 import os
 
-#utils.set_default_cuda_visible_devices()
-utils.set_cuda_visible_devices([0]) # use this to manually set CUDA_VISIBLE_DEVICES
-
 from dense_correspondence.training.training import DenseCorrespondenceTraining
 from dense_correspondence.dataset.spartan_dataset_masked import SpartanDataset
 logging.basicConfig(level=logging.INFO)
