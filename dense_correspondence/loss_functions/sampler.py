@@ -10,7 +10,9 @@ def dispatch_sampler(config):
         outter_radius = config['outter_radius']
         return RingSampler(inner_radius=inner_radius, outter_radius=outter_radius)
     elif name == 'don':
-        return DONSampler()
+        mask_weight = config['mask_weight']
+        background_weight = config['background_weight']
+        return DONSampler(mask_weight=mask_weight, background_weight=background_weight)
     else:
         raise Exception("Sampler: {} not recognized. Supported sampling strategies are: [random, ring, don]".format(name))
 
@@ -87,8 +89,10 @@ class DONSampler(Sampler):
     Class for sampling non-correspondence
     Points are being drawn from input
     """
-    def __init__(self, image_width=640, image_height=480):
+    def __init__(self, image_width=640, image_height=480, mask_weight=1, background_weight=1):
         Sampler.__init__(self, image_width=640, image_height=480)
+        self.mask_weight = mask_weight
+        self.background_weight = background_weight
 
     def reshape_don_non_matches(self, non_matches):
         num_non_matches = len(non_matches)
@@ -98,9 +102,18 @@ class DONSampler(Sampler):
         if num_samples < 0:
             raise Exception('Number of samples must be positive')
 
-        masked_non_matches = self.reshape_don_non_matches(dataset_item.masked_non_matches_b)
-        background_non_matches = self.reshape_don_non_matches(dataset_item.background_non_matches_b)
+        masked = self.reshape_don_non_matches(dataset_item.masked_non_matches_b)
+        masked_num_samples = int(num_samples * self.mask_weight / (self.mask_weight + self.background_weight))
+        random_indices = torch.randint(0, masked.shape[1], (masked_num_samples,))
+        masked_points = masked[:, random_indices]
 
-        non_matches = torch.cat([masked_non_matches, background_non_matches], dim=-1)
-        random_indices = torch.randint(0, non_matches.shape[1], (num_samples,))
-        return non_matches_2[:, random_indices]
+        background = self.reshape_don_non_matches(dataset_item.background_non_matches_b)
+        background_num_samples = num_samples - masked_num_samples
+        random_indices = torch.randint(0, background.shape[1], (background_num_samples,))
+        background_points = background[:, random_indices]
+
+        assert num_samples == masked_num_samples + background_num_samples
+        assert masked_num_samples > 0
+        assert background_num_samples > 0
+
+        return torch.cat([masked_points, background_points], dim=-1)

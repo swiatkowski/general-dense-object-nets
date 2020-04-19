@@ -14,9 +14,10 @@ class NeptuneLogger(Logger):
         experiment = logging_config['experiment']
         description = logging_config['description']
         tags = logging_config['tags']
+        source_files = logging_config['upload_source_files']
 
         self.api.init('{}/{}'.format(namespace, project))
-        self.api.create_experiment(name=experiment, description=description, tags=tags)
+        self.api.create_experiment(name=experiment, description=description, tags=tags, upload_source_files=source_files)
         self.append_tags_from_config(config)
 
     def append_tags_from_config(self, config):
@@ -24,7 +25,7 @@ class NeptuneLogger(Logger):
         loss_name = loss_function_config['name']
         self.api.append_tag([loss_name])
 
-        if loss_function_config['sampler'] is not None:
+        if 'sampler' in loss_function_config:
             sampler_name = loss_function_config['sampler']['name']
             self.api.append_tag(['{}-sampler'.format(sampler_name)])
 
