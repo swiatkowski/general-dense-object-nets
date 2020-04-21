@@ -242,20 +242,16 @@ class DenseCorrespondenceNetwork(nn.Module):
         :rtype:
         """
 
-        # print self.fcn
         if hasattr(self.fcn, 'num_outputs') and self.fcn.num_outputs == 2:
-            return self.fcn(img_tensor)
+            descriptors, reliability = self.fcn(img_tensor)
+        else:
+            descriptors = self.fcn(img_tensor)
+            reliability = None
 
-        res = self.fcn(img_tensor)
-        # TODO: add eps
         if self._normalize:
-            assert 'head' not in self.config or 'class' not in self.config['head'] or \
-                   self.config['head']['class'] not in ['R2D2Net', 'ReliabilitySoftplus']
-            # print "normalizing descriptor norm"
-            norm = torch.norm(res, 2, 1)  # [N,1,H,W]
-            res = res / norm
+            descriptors = F.normalize(descriptors, p=2, dim=1)
 
-        return res, None
+        return descriptors, reliability
 
     def forward_single_image_tensor(self, img_tensor):
         """
@@ -588,9 +584,8 @@ class ReliabilitySoftplus(nn.Module):
             descriptors_output = x
             reliability_output = self.reliability_layer(x)
         else:
-            descriptors_output, reliability_output = torch.split(x, split_size_or_sections=self._descriptor_dimension,
-                                                                 dim=1)
-        descriptors_output = F.normalize(descriptors_output, p=2, dim=1)
+            descriptors_output, reliability_output = torch.split(
+                x, split_size_or_sections=self._descriptor_dimension, dim=1)
         reliability_output = F.softplus(reliability_output).clamp(min=1e-2)
         return descriptors_output, reliability_output
 
@@ -603,8 +598,7 @@ class R2D2Net(nn.Module):
         self.num_outputs = 2
 
     def forward(self, x):
-        x = self.resnet.forward(x)
-        descriptors_output = F.normalize(x, p=2, dim=1)
-        reliability_output = self.reliability_layer(x ** 2)
-        reliability_output = F.softmax(reliability_output, dim=1)[:,1:2]
+        descriptors_output = self.resnet.forward(x)
+        reliability_output = self.reliability_layer(descriptors_output ** 2)
+        reliability_output = F.softmax(reliability_output, dim=1)[:, 1:2]
         return descriptors_output, reliability_output

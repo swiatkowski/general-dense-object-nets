@@ -1448,7 +1448,7 @@ class DenseCorrespondenceEvaluation(object):
                                                                                         plot_masked=True,
                                                                                         output_is_normalized=output_is_normalized)
 
-        if reliability_a is not None:
+        if reliability_a is not None and reliability_b is not None:
             reliability_a = reliability_a.data.cpu().numpy()
             reliability_b = reliability_b.data.cpu().numpy()
 
