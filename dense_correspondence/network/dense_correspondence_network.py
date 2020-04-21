@@ -5,8 +5,8 @@ import numpy as np
 import warnings
 import logging
 import dense_correspondence_manipulation.utils.utils as utils
-utils.add_dense_correspondence_to_python_path()
 
+utils.add_dense_correspondence_to_python_path()
 
 from PIL import Image
 
@@ -18,9 +18,7 @@ import pytorch_segmentation_detection.models.resnet_dilated as resnet_dilated
 from dense_correspondence.dataset.spartan_dataset_masked import SpartanDataset
 
 
-
 class DenseCorrespondenceNetwork(nn.Module):
-
     IMAGE_TO_TENSOR = valid_transform = transforms.Compose([transforms.ToTensor(), ])
 
     def __init__(self, fcn, descriptor_dimension, image_width=640, image_height=480, normalize=True):
@@ -55,7 +53,6 @@ class DenseCorrespondenceNetwork(nn.Module):
         self._descriptor_image_stats = None
         self._normalize = normalize
         self._constructed_from_model_folder = False
-
 
     @property
     def fcn(self):
@@ -133,7 +130,6 @@ class DenseCorrespondenceNetwork(nn.Module):
 
         return self.config['path_to_network_params_folder']
 
-
     @property
     def descriptor_image_stats(self):
         """
@@ -148,7 +144,6 @@ class DenseCorrespondenceNetwork(nn.Module):
             path_to_params = utils.convert_to_absolute_path(self.path_to_network_params_folder)
             descriptor_stats_file = os.path.join(path_to_params, "descriptor_statistics.yaml")
             self._descriptor_image_stats = utils.getDictFromYamlFilename(descriptor_stats_file)
-
 
         return self._descriptor_image_stats
 
@@ -187,8 +182,6 @@ class DenseCorrespondenceNetwork(nn.Module):
         if not self.constructed_from_model_folder:
             return None
 
-
-
         d = utils.getDictFromYamlFilename(identifier_file)
         unique_identifier = d['id'] + "+" + self.config['model_param_filename_tail']
         return unique_identifier
@@ -202,7 +195,6 @@ class DenseCorrespondenceNetwork(nn.Module):
         """
         self._normalize_tensor_transform = transforms.Normalize(self.image_mean, self.image_std_dev)
 
-
     def forward_on_img(self, img, cuda=True):
         """
         Runs the network forward on an image
@@ -215,7 +207,6 @@ class DenseCorrespondenceNetwork(nn.Module):
             img_tensor.cuda()
 
         return self.forward(img_tensor)
-
 
     def forward_on_img_tensor(self, img):
         """
@@ -256,11 +247,13 @@ class DenseCorrespondenceNetwork(nn.Module):
             return self.fcn(img_tensor)
 
         res = self.fcn(img_tensor)
-        #TODO: add eps
+        # TODO: add eps
         if self._normalize:
-            #print "normalizing descriptor norm"
-            norm = torch.norm(res, 2, 1) # [N,1,H,W]
-            res = res/norm
+            assert 'head' not in self.config or 'class' not in self.config['head'] or \
+                   self.config['head']['class'] not in ['R2D2Net', 'ReliabilitySoftplus']
+            # print "normalizing descriptor norm"
+            norm = torch.norm(res, 2, 1)  # [N,1,H,W]
+            res = res / norm
 
         return res, None
 
@@ -280,29 +273,24 @@ class DenseCorrespondenceNetwork(nn.Module):
 
         assert len(img_tensor.shape) == 3
 
-
         # transform to shape [1,3,H,W]
         img_tensor = img_tensor.unsqueeze(0)
 
         # make sure it's on the GPU
         img_tensor = torch.tensor(img_tensor, device=torch.device("cuda"))
 
-
-        res, reliability_map = self.forward(img_tensor) # shape [1,D,H,W]
+        res, reliability_map = self.forward(img_tensor)  # shape [1,D,H,W]
         # print "res.shape 1", res.shape
 
-
-        res = res.squeeze(0) # shape [D,H,W]
+        res = res.squeeze(0)  # shape [D,H,W]
         if reliability_map is not None:
             reliability_map = reliability_map.squeeze(0)
         # print "res.shape 2", res.shape
 
-        res = res.permute(1,2,0) # shape [H,W,D]
+        res = res.permute(1, 2, 0)  # shape [H,W,D]
         # print "res.shape 3", res.shape
 
         return res, reliability_map
-
-
 
     def process_network_output(self, image_pred, reliability_map, N):
         """
@@ -349,7 +337,6 @@ class DenseCorrespondenceNetwork(nn.Module):
         config = utils.getDictFromYamlFilename(dataset_config_file)
         return SpartanDataset(config_expanded=config)
 
-
     @staticmethod
     def get_unet(config):
         """
@@ -360,7 +347,6 @@ class DenseCorrespondenceNetwork(nn.Module):
         from unet_model import UNet
         model = UNet(num_classes=config["descriptor_dimension"]).cuda()
         return model
-
 
     @staticmethod
     def get_fcn(config):
@@ -376,16 +362,21 @@ class DenseCorrespondenceNetwork(nn.Module):
 
         """
 
-        if config["backbone"]["model_class"] == "Resnet":
-            resnet_model = config["backbone"]["resnet_name"]
-            if config["reliability"]:
-                fcn = ReliabilitySoftplus(resnet_model, config['descriptor_dimension'], config["add_conv"])
-            else:
+        if 'head' not in config or 'class' not in config['head'] \
+                or config['head']['class'] is None or config['head']['class'] == 'None':
+            if config["backbone"]["model_class"] == "Resnet":
+                resnet_model = config["backbone"]["resnet_name"]
                 fcn = getattr(resnet_dilated, resnet_model)(num_classes=config['descriptor_dimension'])
-        elif config["backbone"]["model_class"] == "Unet":
-            fcn = DenseCorrespondenceNetwork.get_unet(config)
-        else:
-            raise ValueError("Can't build backbone network.  I don't know this backbone model class!")
+            elif config["backbone"]["model_class"] == "Unet":
+                fcn = DenseCorrespondenceNetwork.get_unet(config)
+            else:
+                raise ValueError("Can't build backbone network.  I don't know this backbone model class!")
+        elif config['head']['class'] == 'ReliabilitySoftplus':
+            fcn = ReliabilitySoftplus(config["backbone"]["resnet_name"],
+                                      config['descriptor_dimension'],
+                                      config['head']["add_conv"])
+        elif config['head']['class'] == 'R2D2Net':
+            fcn = R2D2Net(config["backbone"]["resnet_name"], config['descriptor_dimension'])
 
         return fcn
 
@@ -426,13 +417,13 @@ class DenseCorrespondenceNetwork(nn.Module):
             normalize = False
 
         dcn = DenseCorrespondenceNetwork(fcn, config['descriptor_dimension'],
-                                          image_width=config['image_width'],
-                                          image_height=config['image_height'],
+                                         image_width=config['image_width'],
+                                         image_height=config['image_height'],
                                          normalize=normalize)
 
         if load_stored_params:
             assert model_param_file is not None
-            config['model_param_file'] = model_param_file # should be an absolute path
+            config['model_param_file'] = model_param_file  # should be an absolute path
             try:
                 dcn.load_state_dict(torch.load(model_param_file))
             except:
@@ -446,7 +437,7 @@ class DenseCorrespondenceNetwork(nn.Module):
 
     @staticmethod
     def from_model_folder(model_folder, load_stored_params=True, model_param_file=None,
-        iteration=None):
+                          iteration=None):
         """
         Loads a DenseCorrespondenceNetwork from a model folder
         :param model_folder: the path to the folder where the model is stored. This direction contains
@@ -475,18 +466,12 @@ class DenseCorrespondenceNetwork(nn.Module):
         config["path_to_network_params_folder"] = model_folder
         config["model_param_filename_tail"] = os.path.split(model_param_file)[1]
 
-
-
-
         dcn = DenseCorrespondenceNetwork.from_config(config,
                                                      load_stored_params=load_stored_params,
                                                      model_param_file=model_param_file)
 
-
         # whether or not network was constructed from model folder
         dcn.constructed_from_model_folder = from_model_folder
-
-
 
         dcn.model_folder = model_folder
         return dcn
@@ -513,7 +498,6 @@ class DenseCorrespondenceNetwork(nn.Module):
             print "height: ", height
             print "width: ", width
             print "res_b.shape: ", res_b.shape
-
 
         # non-vectorized version
         # norm_diffs = np.zeros([height, width])
@@ -556,7 +540,6 @@ class DenseCorrespondenceNetwork(nn.Module):
 
         return best_match_uv, best_match_diff, norm_diffs
 
-
     def evaluate_descriptor_at_keypoints(self, res, keypoint_list):
         """
 
@@ -575,11 +558,11 @@ class DenseCorrespondenceNetwork(nn.Module):
 
         N = len(keypoint_list)
         D = self.descriptor_dimension
-        des = np.zeros([N,D])
+        des = np.zeros([N, D])
 
         for idx, kp in enumerate(keypoint_list):
             uv = self.clip_pixel_to_image_size_and_round([kp.pt[0], kp.pt[1]])
-            des[idx,:] = res[uv[1], uv[0], :]
+            des[idx, :] = res[uv[1], uv[0], :]
 
         # cast to float32, need this in order to use cv2.BFMatcher() with bf.knnMatch
         des = np.array(des, dtype=np.float32)
@@ -609,4 +592,19 @@ class ReliabilitySoftplus(nn.Module):
                                                                  dim=1)
         descriptors_output = F.normalize(descriptors_output, p=2, dim=1)
         reliability_output = F.softplus(reliability_output).clamp(min=1e-2)
+        return descriptors_output, reliability_output
+
+
+class R2D2Net(nn.Module):
+    def __init__(self, resnet_model, descriptor_dimension):
+        super(R2D2Net, self).__init__()
+        self.resnet = getattr(resnet_dilated, resnet_model)(descriptor_dimension)
+        self.reliability_layer = nn.Conv2d(in_channels=descriptor_dimension, out_channels=2, kernel_size=1)
+        self.num_outputs = 2
+
+    def forward(self, x):
+        x = self.resnet.forward(x)
+        descriptors_output = F.normalize(x, p=2, dim=1)
+        reliability_output = self.reliability_layer(x ** 2)
+        reliability_output = F.softmax(reliability_output, dim=1)[:,1:2]
         return descriptors_output, reliability_output

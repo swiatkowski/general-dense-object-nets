@@ -4,6 +4,7 @@
 #SBATCH --partition=common
 #SBATCH --qos=8gpu3d
 #SBATCH --gres=gpu:1
+#SBATCH -c 8
 /bin/hostname
 singularity exec --nv \
   --bind /scidatasm/dense_object_nets/data:/home/$USER/data \

@@ -273,7 +273,7 @@ class DenseCorrespondenceTraining(object):
             loss_function = PixelAPLoss(nq=nq, sampler=sampler, num_samples=num_samples)
             loss_function.cuda()
         elif self._config['loss_function']['name'] == 'probabilistic_loss':
-            probabilistic_loss = ProbabilisticLoss(image_shape=dcn.image_shape, config=self._config['loss_function'])
+            loss_function = ProbabilisticLoss(image_shape=dcn.image_shape, config=self._config['loss_function'])
         else:
             raise ValueError("Couldn't find your loss_function: " + self._config['loss_function']['name'])
 
@@ -353,17 +353,13 @@ class DenseCorrespondenceTraining(object):
                 # get loss
                 loss, match_loss, masked_non_match_loss, background_non_match_loss, blind_non_match_loss = 0, 0, 0, 0, 0
                 if self._config['loss_function']['name'] == 'pixelwise_contrastive_loss':
-                    loss, match_loss, masked_non_match_loss, \
-                    background_non_match_loss, blind_non_match_loss = loss_composer.get_loss(pixelwise_contrastive_loss,
-                                                                                             match_type,
-                                                                                             image_a_pred, image_b_pred,
-                                                                                             matches_a, matches_b,
-                                                                                             masked_non_matches_a,
-                                                                                             masked_non_matches_b,
-                                                                                             background_non_matches_a,
-                                                                                             background_non_matches_b,
-                                                                                             blind_non_matches_a,
-                                                                                             blind_non_matches_b)
+                    loss, match_loss, masked_non_match_loss, background_non_match_loss, blind_non_match_loss = \
+                        loss_composer.get_loss(loss_function, match_type,
+                                               image_a_pred, image_b_pred,
+                                               matches_a, matches_b,
+                                               masked_non_matches_a, masked_non_matches_b,
+                                               background_non_matches_a, background_non_matches_b,
+                                               blind_non_matches_a, blind_non_matches_b)
                     self.logger.log('loss', loss.item())
                     self.logger.log('match_loss', match_loss.item())
                     self.logger.log('masked_non_match_loss', masked_non_match_loss.item())
@@ -371,17 +367,20 @@ class DenseCorrespondenceTraining(object):
                     self.logger.log('blind_non_match_loss', blind_non_match_loss.item())
 
                 elif self._config['loss_function']['name'] == 'aploss':
-                    loss = loss_function(image_a_pred, image_b_pred, dataset_item)
+                    # loss = loss_function(image_a_pred, image_b_pred, dataset_item)
+                    loss = loss_function.get_loss(image_a_pred, image_b_pred,
+                                                  dataset_item,
+                                                  reliability_a, reliability_b)
                     self.logger.log('loss', loss.item())
 
                 elif self._config['loss_function']['name'] == 'probabilistic_loss':
-                    loss = probabilistic_loss.get_loss(match_type,
-                                                       image_a_pred, image_b_pred,
-                                                       reliability_a, reliability_b,
-                                                       matches_a, matches_b,
-                                                       masked_non_matches_a, masked_non_matches_b,
-                                                       background_non_matches_a, background_non_matches_b,
-                                                       blind_non_matches_a, blind_non_matches_b)
+                    loss = loss_function.get_loss(match_type,
+                                                  image_a_pred, image_b_pred,
+                                                  reliability_a, reliability_b,
+                                                  matches_a, matches_b,
+                                                  masked_non_matches_a, masked_non_matches_b,
+                                                  background_non_matches_a, background_non_matches_b,
+                                                  blind_non_matches_a, blind_non_matches_b)
                     self.logger.log('loss', loss.item())
 
                 else:
