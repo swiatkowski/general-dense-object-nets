@@ -39,6 +39,7 @@ from dense_correspondence.loss_functions.ap_loss import PixelAPLoss
 from dense_correspondence.loss_functions.sampler import RingSampler, RandomSampler, DONSampler, dispatch_sampler
 import dense_correspondence.loss_functions.loss_composer as loss_composer
 from dense_correspondence.evaluation.evaluation import DenseCorrespondenceEvaluation
+from dense_correspondence.evaluation.evaluation import DenseCorrespondenceEvaluationPlotter as DCEP
 from dense_correspondence.evaluation.plotting import normalize_descriptor
 from dense_correspondence.logging.dispatcher import dispatch_logger
 
@@ -301,8 +302,8 @@ class DenseCorrespondenceTraining(object):
         for epoch in range(50):  # loop over the dataset multiple times
             for i, data in enumerate(self._data_loader, 0):
                 loss_current_iteration += 1
-                self.logger.log('epoch', epoch)
-                self.logger.log('iteration', loss_current_iteration)
+                self.logger.log('epoch', x=i, y=epoch)
+                self.logger.log('iteration', x=i, y=i)
 
                 iteration_time = time.time()
 
@@ -341,7 +342,7 @@ class DenseCorrespondenceTraining(object):
 
                 optimizer.zero_grad()
                 self.adjust_learning_rate(optimizer, loss_current_iteration)
-                self.logger.log('learning rate', self.get_learning_rate(optimizer))
+                self.logger.log('learning rate', x=i, y=self.get_learning_rate(optimizer))
 
                 # run both images through the network
                 image_a_pred_, reliability_a_ = dcn.forward(img_a)
@@ -353,36 +354,36 @@ class DenseCorrespondenceTraining(object):
                 # get loss
                 loss, match_loss, masked_non_match_loss, background_non_match_loss, blind_non_match_loss = 0, 0, 0, 0, 0
                 if self._config['loss_function']['name'] == 'pixelwise_contrastive_loss':
-                    loss, match_loss, masked_non_match_loss, background_non_match_loss, blind_non_match_loss = \
-                        loss_composer.get_loss(loss_function, match_type,
-                                               image_a_pred, image_b_pred,
-                                               matches_a, matches_b,
-                                               masked_non_matches_a, masked_non_matches_b,
-                                               background_non_matches_a, background_non_matches_b,
-                                               blind_non_matches_a, blind_non_matches_b)
-                    self.logger.log('loss', loss.item())
-                    self.logger.log('match_loss', match_loss.item())
-                    self.logger.log('masked_non_match_loss', masked_non_match_loss.item())
-                    self.logger.log('background_non_match_loss', background_non_match_loss.item())
-                    self.logger.log('blind_non_match_loss', blind_non_match_loss.item())
+                    loss, match_loss, masked_non_match_loss, \
+                    background_non_match_loss, blind_non_match_loss = loss_composer.get_loss(pixelwise_contrastive_loss,
+                                                                                             match_type,
+                                                                                             image_a_pred, image_b_pred,
+                                                                                             matches_a, matches_b,
+                                                                                             masked_non_matches_a,
+                                                                                             masked_non_matches_b,
+                                                                                             background_non_matches_a,
+                                                                                             background_non_matches_b,
+                                                                                             blind_non_matches_a,
+                                                                                             blind_non_matches_b)
+                    self.logger.log('loss', x=i, y=loss.item())
+                    self.logger.log('match_loss', x=i, y=match_loss.item())
+                    self.logger.log('masked_non_match_loss', x=i, y=masked_non_match_loss.item())
+                    self.logger.log('background_non_match_loss', x=i, y=background_non_match_loss.item())
+                    self.logger.log('blind_non_match_loss', x=i, y=blind_non_match_loss.item())
 
                 elif self._config['loss_function']['name'] == 'aploss':
-                    # loss = loss_function(image_a_pred, image_b_pred, dataset_item)
-                    loss = loss_function.get_loss(image_a_pred, image_b_pred,
-                                                  dataset_item,
-                                                  reliability_a, reliability_b)
-                    self.logger.log('loss', loss.item())
+                    loss = loss_function(image_a_pred, image_b_pred, dataset_item, reliability_a, reliability_b)
+                    self.logger.log('loss', x=i, y=loss.item())
 
                 elif self._config['loss_function']['name'] == 'probabilistic_loss':
-                    loss = loss_function.get_loss(match_type,
-                                                  image_a_pred, image_b_pred,
-                                                  reliability_a, reliability_b,
-                                                  matches_a, matches_b,
-                                                  masked_non_matches_a, masked_non_matches_b,
-                                                  background_non_matches_a, background_non_matches_b,
-                                                  blind_non_matches_a, blind_non_matches_b)
-                    self.logger.log('loss', loss.item())
-
+                    loss = probabilistic_loss.get_loss(match_type,
+                                                       image_a_pred, image_b_pred,
+                                                       reliability_a, reliability_b,
+                                                       matches_a, matches_b,
+                                                       masked_non_matches_a, masked_non_matches_b,
+                                                       background_non_matches_a, background_non_matches_b,
+                                                       blind_non_matches_a, blind_non_matches_b)
+                    self.logger.log('loss', x=i, y=loss.item())
                 else:
                     raise NotImplementedError('loss function')
 
@@ -390,8 +391,8 @@ class DenseCorrespondenceTraining(object):
                 optimizer.step()
 
                 elapsed = time.time() - iteration_time
-                self.logger.log('training iteration time', time.time() - iteration_time)
-                self.logger.log('total time', time.time() - total_time)
+                self.logger.log('training iteration time', x=i, y=time.time() - iteration_time)
+                self.logger.log('total time', x=i, y=time.time() - total_time)
 
                 def update_plots(loss, match_loss, masked_non_match_loss, background_non_match_loss, blind_non_match_loss):
                     """
@@ -460,9 +461,9 @@ class DenseCorrespondenceTraining(object):
                     output_is_normalized = self._config['dense_correspondence_network']['normalize']
                     evaluations = DCE.evaluate_network_qualitative_without_plotting(dcn, dataset=self.dataset, randomize=True, output_is_normalized=output_is_normalized)
                     for e, _ in evaluations['train_evals']:
-                        self.logger.log('Train eval - iter {}'.format(i), e * 255.0, 'image')
+                        self.logger.log('Train eval - iter {}'.format(i), e * 255.0, type='image')
                     for e, _ in evaluations['test_evals']:
-                        self.logger.log('Test eval - iter {}'.format(i), e * 255.0, 'image')
+                        self.logger.log('Test eval - iter {}'.format(i), e * 255.0, type='image')
 
                 # don't compute the test loss on the first few times through the loop
                 if self._config["training"]["compute_test_loss"] and (loss_current_iteration % compute_test_loss_rate
@@ -497,13 +498,36 @@ class DenseCorrespondenceTraining(object):
                     logging.info("Finished testing after %d iterations" % (max_num_iterations))
                     self.save_network(dcn, optimizer, loss_current_iteration, logging_dict=self._logging_dict,
                                       last_only=False)
+                    self.evaluate_quantitative(iteration=loss_current_iteration)
                     self.logger.exit()
                     return
 
 
-    def log_prediction(self, descriptor, iter):
-        normalized_descriptor = normalize_descriptor(descriptor.detach().cpu().numpy().transpose(1,2,0)) * 255
-        self.logger.log(iter, normalized_descriptor, 'image')
+    def evaluate_quantitative(self, iteration):
+        DCE = DenseCorrespondenceEvaluation
+        num_image_pairs = self._config['evaluation']['num_image_pairs']
+        cross_scene = self._config['evaluation']['cross_scene']
+        compute_descriptor_statistics = self._config['evaluation']['compute_descriptor_statistics']
+        DCE.run_evaluation_on_network(
+            self._logging_dir,
+            num_image_pairs=num_image_pairs,
+            cross_scene=True,
+            compute_descriptor_statistics=True,
+            iteration=iteration,
+            dataset=self.dataset
+        )
+
+        # train
+        path_to_csv = os.path.join(self._logging_dir, "analysis/train/data.csv")
+        DCEP.log_metrics_from_dataframe(self.logger, path_to_csv, title_prefix='train')
+
+        # test
+        path_to_csv = os.path.join(self._logging_dir, "analysis/test/data.csv")
+        DCEP.log_metrics_from_dataframe(self.logger, path_to_csv, title_prefix='test')
+
+        # eval
+        path_to_csv = os.path.join(self._logging_dir, "analysis/cross_scene/data.csv")
+        DCEP.log_metrics_from_dataframe(self.logger, path_to_csv, title_prefix='eval')
 
     def setup_logging_dir(self):
         """
@@ -567,10 +591,12 @@ class DenseCorrespondenceTraining(object):
         print('Saving to params to file: ', network_param_file)
 
         torch.save(dcn.state_dict(), network_param_file)
-        self.logger.log('Model state', network_param_file, 'file')
+        self.logger.log('Model state', x=network_param_file, type='file')
 
         torch.save(optimizer.state_dict(), optimizer_param_file)
-        self.logger.log('Optimizer state', optimizer_param_file, 'file')
+        self.logger.log('Optimizer state', x=optimizer_param_file, type='file')
+
+        self.logger.send_logs()
 
     def save_configs(self):
         """
@@ -580,12 +606,13 @@ class DenseCorrespondenceTraining(object):
         """
         training_params_file = os.path.join(self._logging_dir, 'training.yaml')
         utils.saveToYaml(self._config, training_params_file)
-        self.logger.log('Training config', training_params_file, 'file')
+        self.logger.log('Training config', x=training_params_file, type='file')
 
         dataset_params_file = os.path.join(self._logging_dir, 'dataset.yaml')
         utils.saveToYaml(self._dataset.config, dataset_params_file)
-        self.logger.log('Dataset config', dataset_params_file, 'file')
+        self.logger.log('Dataset config', x=dataset_params_file, type='file')
 
+        self.logger.send_logs()
 
     def adjust_learning_rate(self, optimizer, iteration):
         """

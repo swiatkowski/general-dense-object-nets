@@ -945,8 +945,6 @@ class DenseCorrespondenceEvaluation(object):
         if debug:
             match_list = [50]
 
-        logging_rate = 100
-
         image_height, image_width = dcn.image_shape
 
         DCE = DenseCorrespondenceEvaluation
@@ -2734,9 +2732,16 @@ class DenseCorrespondenceEvaluationPlotter(object):
     encapsulated as static methods
 
     """
-
     def __init__(self):
         pass
+
+    @staticmethod
+    def compute_cdf(data, num_bins, x_axis_scale_factor=1):
+        cumhist, l, b, e = ss.cumfreq(data, num_bins)
+        cumhist *= 1.0 / len(data)
+        x_axis = l + b * np.arange(0, num_bins)
+        x_axis /= x_axis_scale_factor
+        return x_axis, cumhist
 
     @staticmethod
     def make_cdf_plot(ax, data, num_bins, label=None, x_axis_scale_factor=1):
@@ -2750,12 +2755,18 @@ class DenseCorrespondenceEvaluationPlotter(object):
         :return:
         :rtype:
         """
-        cumhist, l, b, e = ss.cumfreq(data, num_bins)
-        cumhist *= 1.0 / len(data)
-        x_axis = l + b * np.arange(0, num_bins)
-        x_axis /= x_axis_scale_factor
-        plot = ax.plot(x_axis, cumhist, label=label)
+        DCEP = DenseCorrespondenceEvaluationPlotter
+        x, y = DCEP.compute_cdf(data, num_bins, x_axis_scale_factor)
+        plot = ax.plot(x, y, label=label)
         return plot
+
+    @staticmethod
+    def log_cdf(logger, metric_name, data, num_bins, x_axis_scale_factor=1):
+        DCEP = DenseCorrespondenceEvaluationPlotter
+        xs, ys = DCEP.compute_cdf(data, num_bins, x_axis_scale_factor)
+        for x, y in zip(xs, ys):
+            logger.log(metric_name, x=x, y=y)
+        logger.send_logs()
 
     @staticmethod
     def make_pixel_match_error_plot(ax, df, label=None, num_bins=100, masked=False):
@@ -2788,6 +2799,27 @@ class DenseCorrespondenceEvaluationPlotter(object):
 
         # ax.set_xlim([0,200])
         return plot
+
+    @staticmethod
+    def log_pixel_match_error(logger, df, title_prefix, num_bins=100, masked=False):
+        DCEP = DenseCorrespondenceEvaluationPlotter
+        metric_name = 'pixel_match_error_l2'
+        if masked:
+            metric_name += '_masked'
+        data = df[metric_name]
+
+        # rescales the pixel distance to be relative to the diagonal of the image
+        x_axis_scale_factor = 800
+        plot_title = title_prefix + '_' + metric_name
+        DCEP.log_cdf(logger, plot_title, data, num_bins=num_bins, x_axis_scale_factor=x_axis_scale_factor)
+
+    @staticmethod
+    def log_across_object_best_match(logger, df, title_prefix, num_bins=100):
+        DCEP = DenseCorrespondenceEvaluationPlotter
+        plot_title = title_prefix + '_descriptor_best_match_l2'
+        metric_name = 'norm_diff_descriptor_best_match'
+        data = df[metric_name]
+        DCEP.log_cdf(logger, plot_title, data, num_bins=num_bins)
 
     @staticmethod
     def make_across_object_best_match_plot(ax, df, label=None, num_bins=100):
@@ -2842,6 +2874,21 @@ class DenseCorrespondenceEvaluationPlotter(object):
         return plot
 
     @staticmethod
+    def log_descriptor_accuracy(logger, df, title_prefix, num_bins=100, masked=False):
+        DCEP = DenseCorrespondenceEvaluationPlotter
+        plot_title = title_prefix + '_3D_match_error_L2(cm)'
+        metric_name = 'norm_diff_pred_3d'
+        if masked:
+            metric_name += '_masked'
+            plot_title += '_masked'
+
+        data = df[metric_name]
+        data = data.dropna()
+        data *= 100  # convert to cm
+
+        DCEP.log_cdf(logger, plot_title, data, num_bins=num_bins)
+
+    @staticmethod
     def make_norm_diff_ground_truth_plot(ax, df, label=None, num_bins=100, masked=False):
         """
         :param ax: axis of a matplotlib plot to plot on
@@ -2860,6 +2907,16 @@ class DenseCorrespondenceEvaluationPlotter(object):
         ax.set_xlabel('Descriptor match error, L2')
         ax.set_ylabel('Fraction of images')
         return plot
+
+    @staticmethod
+    def log_norm_diff_ground_truth(logger, df, title_prefix, num_bins=100, masked=False):
+        DCEP = DenseCorrespondenceEvaluationPlotter
+
+        data = df['norm_diff_descriptor_ground_truth']
+
+        plot_title = title_prefix + '_descriptor_match_error_l2'
+        DCEP.log_cdf(logger, plot_title, data, num_bins=num_bins)
+
 
     @staticmethod
     def make_fraction_false_positives_plot(ax, df, label=None, num_bins=100, masked=False):
@@ -2894,6 +2951,20 @@ class DenseCorrespondenceEvaluationPlotter(object):
         return plot
 
     @staticmethod
+    def log_fraction_false_positives(logger, df, title_prefix, num_bins=100, masked=False):
+        DCEP = DenseCorrespondenceEvaluationPlotter
+
+        plot_title = title_prefix + '_fraction_false_positives'
+        metric_name = 'fraction_pixels_closer_than_ground_truth'
+        if masked:
+            metric_name += '_masked'
+            plot_title += '_masked'
+
+        data = df[metric_name]
+
+        DCEP.log_cdf(logger, plot_title, data, num_bins=num_bins)
+
+    @staticmethod
     def make_average_l2_false_positives_plot(ax, df, label=None, num_bins=100, masked=False):
         """
         :param ax: axis of a matplotlib plot to plot on
@@ -2923,6 +2994,20 @@ class DenseCorrespondenceEvaluationPlotter(object):
         return plot
 
     @staticmethod
+    def log_average_l2_false_positives(logger, df, title_prefix, num_bins=100, masked=False):
+        DCEP = DenseCorrespondenceEvaluationPlotter
+        plot_title = title_prefix + '_average_l2_distance_for_false_positives'
+        metric_name = 'average_l2_distance_for_false_positives'
+        if masked:
+            metric_name += '_masked'
+            plot_title += '_masked'
+
+        data = df[metric_name]
+
+        DCEP.log_cdf(logger, plot_title, data, num_bins=num_bins)
+
+
+    @staticmethod
     def compute_area_above_curve(df, field, num_bins=100):
         """
         Computes AOC for the entries in that field
@@ -2943,6 +3028,45 @@ class DenseCorrespondenceEvaluationPlotter(object):
         # b is bin width
         area_above_curve = b * np.sum((1 - cumhist))
         return area_above_curve
+
+
+    @staticmethod
+    def log_metrics_from_dataframe(logger, path_to_df_csv, title_prefix=''):
+        """
+        Same as DCEP.run_on_single_dataframe() but send logs to logger instead of plotting
+        """
+        DCEP = DenseCorrespondenceEvaluationPlotter
+        path_to_csv = utils.convert_data_relative_path_to_absolute_path(path_to_df_csv, assert_path_exists=True)
+        df = pd.read_csv(path_to_csv, index_col=0, parse_dates=True)
+        use_masked_plots = 'is_valid_masked' in df
+
+        # pixel match error
+        DCEP.log_pixel_match_error(logger, df, title_prefix=title_prefix)
+        if use_masked_plots:
+            DCEP.log_pixel_match_error(logger, df, title_prefix=title_prefix, masked=True)
+
+        # 3D match error
+        DCEP.log_descriptor_accuracy(logger, df, title_prefix=title_prefix)
+        if use_masked_plots:
+            DCEP.log_descriptor_accuracy(logger, df, title_prefix=title_prefix, masked=True)
+
+        # aac = DCEP.compute_area_above_curve(df, 'norm_diff_pred_3d')
+        # logger.log(title_prefix + '_norm_diff_pred_3d', aac)
+        # d = dict()
+        # d['norm_diff_3d_area_above_curve'] = float(aac)
+
+        # norm difference of the ground truth match (should be 0)
+        DCEP.log_norm_diff_ground_truth(logger, df, title_prefix=title_prefix)
+
+        # fraction false positives
+        DCEP.log_fraction_false_positives(logger, df, title_prefix=title_prefix)
+        if use_masked_plots:
+            DCEP.log_fraction_false_positives(logger, df, title_prefix=title_prefix, masked=True)
+
+        # average l2 false positives
+        DCEP.log_average_l2_false_positives(logger, df, title_prefix=title_prefix)
+        if use_masked_plots:
+            DCEP.log_average_l2_false_positives(logger, df, title_prefix=title_prefix, masked=True)
 
     @staticmethod
     def run_on_single_dataframe(path_to_df_csv, label=None, output_dir=None, save=True, previous_fig_axes=None,
