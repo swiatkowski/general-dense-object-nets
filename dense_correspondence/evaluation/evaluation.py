@@ -543,14 +543,27 @@ class DenseCorrespondenceEvaluation(object):
         return pd_dataframe_list, df
 
     @staticmethod
-    def plot_reliability_maps(reliability_a, reliability_b, num_descriptors):
+    def plot_reliability_maps(reliability_a, reliability_b):
         assert reliability_a is not None
         assert reliability_b is not None
         assert reliability_a.shape[0] == 1, 'assume that batch size is 1 for evaluation'
         reliability_a = np.squeeze(reliability_a, axis=0)
         reliability_b = np.squeeze(reliability_b, axis=0)
-        reliability_a = np.repeat(reliability_a[:, :, np.newaxis], num_descriptors, axis=2)
-        reliability_b = np.repeat(reliability_b[:, :, np.newaxis], num_descriptors, axis=2)
+
+        # Normalization of reliability maps on [0, 1] range if they are not normalized.
+        reliability_a_min = reliability_a.min()
+        reliability_b_min = reliability_b.min()
+        reliability_a_max = reliability_a.max()
+        reliability_b_max = reliability_b.max()
+        both_reliability_maps_min = min(reliability_a_min, reliability_b_min)
+        both_reliability_maps_max = min(reliability_a_max, reliability_b_max)
+        if not (0 <= both_reliability_maps_min and both_reliability_maps_max <= 1):
+            stats = {'min': both_reliability_maps_min, 'max': both_reliability_maps_max}
+            reliability_a = dc_plotting.normalize_descriptor(reliability_a, stats)
+            reliability_b = dc_plotting.normalize_descriptor(reliability_b, stats)
+
+        reliability_a = np.repeat(reliability_a[:, :, np.newaxis], 3, axis=2)
+        reliability_b = np.repeat(reliability_b[:, :, np.newaxis], 3, axis=2)
         return reliability_a, reliability_b
 
     @staticmethod
@@ -1453,7 +1466,7 @@ class DenseCorrespondenceEvaluation(object):
             reliability_b = reliability_b.data.cpu().numpy()
 
             reliability_a, reliability_b = DenseCorrespondenceEvaluation.plot_reliability_maps(
-                reliability_a, reliability_b, np.shape(res_a)[2])
+                reliability_a, reliability_b)
             reliability_maps = ReliabilityMap(reliability_a, reliability_b)
         else:
             reliability_maps = None
