@@ -81,3 +81,6 @@ logging:
     - 'general-dense-object-nets'
     - 'unknown_user'
     - 'aploss'
+  upload_source_files:
+    -- training.py
+    -- train2.sh
