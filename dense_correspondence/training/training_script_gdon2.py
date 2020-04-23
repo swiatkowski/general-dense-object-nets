@@ -22,6 +22,7 @@ def parse_args():
     parser.add_argument('--mask-weight', type=int, default=1)
     parser.add_argument('--bg-weight', type=int, default=2)
     parser.add_argument('--num-non-matches', type=int, default=150)
+    parser.add_argument('--normalize', action='store_true')
     return parser.parse_args()
 
 
