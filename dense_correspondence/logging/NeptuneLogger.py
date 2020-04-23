@@ -30,15 +30,15 @@ class NeptuneLogger(Logger):
             self.api.append_tag(['{}-sampler'.format(sampler_name)])
 
     def send_logs(self):
-        for metric, value, type in self.storage:
+        for metric, x, y, type in self.storage:
             if type == 'number':
-                self.api.log_metric(metric, value)
+                self.api.log_metric(metric, x=x, y=y)
             elif type == 'text':
-                self.api.log_text(metric, value)
+                self.api.log_text(metric, x=x, y=y)
             elif type == 'image':
-                self.api.log_image(metric, value)
+                self.api.log_image(metric, x=x, y=y)
             elif type == 'file':
-                self.api.log_artifact(value)
+                self.api.log_artifact(x)
             else:
                 raise Exception("Metric type '{}' not recognized. Supported types are: [number, text, iamge, file]".format(type))
 
