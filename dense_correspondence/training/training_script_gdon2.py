@@ -10,7 +10,6 @@ utils.add_dense_correspondence_to_python_path()
 from dense_correspondence.training.training import DenseCorrespondenceTraining
 from dense_correspondence.dataset.spartan_dataset_masked import SpartanDataset
 
-utils.set_cuda_visible_devices([0])
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Parameters for train/test script')
@@ -23,11 +22,15 @@ def parse_args():
     parser.add_argument('--bg-weight', type=int, default=2)
     parser.add_argument('--num-non-matches', type=int, default=150)
     parser.add_argument('--normalize', action='store_true')
+    parser.add_argument('--gpu-slot', type=int, default=0)
     return parser.parse_args()
 
 
 if __name__ == '__main__':
     args = parse_args()
+
+    utils.set_cuda_visible_devices([args.gpu_slot])
+
     src_dir = utils.getDenseCorrespondenceSourceDir()
     configs_dir = 'config/dense_correspondence'
 
