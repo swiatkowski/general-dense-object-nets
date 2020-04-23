@@ -17,6 +17,10 @@ def parse_args():
     parser.add_argument('--loss', type=str, default='pixelwise_contrastive_loss')
     parser.add_argument('--bg-frac', type=float, default=0.5)
     parser.add_argument('--mask-frac', type=float, default=0.5)
+    parser.add_argument('--num-iterations', type=int, default=3500)
+    parser.add_argument('--sampler', type=str, default='don')
+    parser.add_argument('--mask-weight', type=int, default=1)
+    parser.add_argument('--bg-weight', type=int, default=2)
     return parser.parse_args()
 
 
@@ -39,14 +43,14 @@ if __name__ == '__main__':
     train_config["training"]["logging_dir_name"] = 'shoes_{}'.format(time_string)
     train_config["training"]["logging_dir"] = "trained_models"
     train_config["dense_correspondence_network"]["descriptor_dimension"] = 3
-    train_config["training"]["num_iterations"] = 3500
+    train_config["training"]["num_iterations"] = args.num_iterations
 
     train_config['loss_function']['name'] = args.loss
     train_config['loss_function']['nq'] = 25
     train_config['loss_function']['num_samples'] = 150
-    train_config['loss_function']['sampler']['name'] = 'don'
-    train_config['loss_function']['sampler']['mask_weight'] = 1
-    train_config['loss_function']['sampler']['background_weight'] = 2
+    train_config['loss_function']['sampler']['name'] = args.sampler
+    train_config['loss_function']['sampler']['mask_weight'] = args.mask_weight
+    train_config['loss_function']['sampler']['background_weight'] = args.bg_weight
 
 
     train_config["training"]["save_rate"] = 5000
