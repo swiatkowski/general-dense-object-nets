@@ -48,6 +48,7 @@ if __name__ == '__main__':
     train_config["training"]["logging_dir_name"] = 'shoes_{}'.format(time_string)
     train_config["training"]["logging_dir"] = "trained_models"
     train_config["dense_correspondence_network"]["descriptor_dimension"] = 3
+    train_config["dense_correspondence_network"]["normalize"] = args.normalize
     train_config["training"]["num_iterations"] = args.num_iterations
 
     train_config['loss_function']['name'] = args.loss
