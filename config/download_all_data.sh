@@ -23,3 +23,7 @@ do
   echo "Downloading data for $config"
   python "$code_dir/config/download_pdc_data.py" "$config" "$data_dir"
 done
+
+# Give read permissions to others
+find $data_dir -type d -print0 | xargs -0 chmod o=rx
+find $data_dir -type f -print0 | xargs -0 chmod o=r
