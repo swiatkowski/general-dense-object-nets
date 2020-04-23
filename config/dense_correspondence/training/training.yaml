@@ -27,11 +27,9 @@ training:
     DIFFERENT_OBJECT: 0
     MULTI_OBJECT: 0
     SYNTHETIC_MULTI_OBJECT: 0
-  # Loss function config
-  loss_function: pixelwise_contrastive_loss # not currently used
   # Logging config
   logging_rate: 100 # how often to print out
-  save_rate: 1000 # how often to save the network
+  save_rate: 5000 # how often to save the network
   logging_dir_name: test # overwrites if this is here
   logging_dir: trained_models # where to store trained models
 
@@ -47,7 +45,7 @@ dense_correspondence_network:
     # If Unet
     # currently no options supported
   head:
-    class: 'R2D2Net'  # options: {None, R2D2Net, ReliabilitySoftplus}
+    class: None  # options: {None, R2D2Net, ReliabilitySoftplus}
     add_conv: True    # This is an additional option for ReliabilitySoftplus net
 
 loss_function:
@@ -76,7 +74,7 @@ logging:
   project: 'general-dense-object-nets'
   experiment: 'shoes'
   description: 'This is example description'
-  qualitative_evaluation_logging_rate: 500
+  qualitative_evaluation_logging_rate: 100
   tags: # list as many tags you want. They intend to help you search/filter experiemnts
     - 'general-dense-object-nets'
     - 'unknown_user'
@@ -84,3 +82,9 @@ logging:
   upload_source_files:
     -- training.py
     -- train2.sh
+
+
+evaluation:
+  num_image_pairs: 100
+  cross_scene: true
+  compute_descriptor_statistics: true
