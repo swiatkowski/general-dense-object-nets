@@ -1,5 +1,6 @@
 import os
 import time
+import argparse
 
 import dense_correspondence_manipulation.utils.utils as utils
 utils.add_dense_correspondence_to_python_path()
@@ -8,8 +9,16 @@ from dense_correspondence.dataset.spartan_dataset_masked import SpartanDataset
 
 utils.set_cuda_visible_devices([0])
 
+def parse_args():
+    parser = argparse.ArgumentParser(description='Parameters for train/test script')
+    parser.add_argument('--loss', type=str, default='pixelwise_contrastive_loss')
+    parser.add_argument('--bg-frac', type=float, default=0.5)
+    parser.add_argument('--mask-frac', type=float, default=0.5)
+    return parser.parse_args()
+
 
 if __name__ == '__main__':
+    args = parse_args()
     src_dir = utils.getDenseCorrespondenceSourceDir()
     configs_dir = 'config/dense_correspondence'
 
@@ -29,12 +38,17 @@ if __name__ == '__main__':
     train_config["dense_correspondence_network"]["descriptor_dimension"] = 3
     train_config["training"]["num_iterations"] = 3500
 
-    train_config['loss_function']['name'] = 'aploss'
+    train_config['loss_function']['name'] = args.loss
     train_config['loss_function']['nq'] = 25
     train_config['loss_function']['num_samples'] = 150
     train_config['loss_function']['sampler']['name'] = 'don'
     train_config['loss_function']['sampler']['mask_weight'] = 1
     train_config['loss_function']['sampler']['background_weight'] = 2
+
+
+    train_config["training"]["save_rate"] = 5000
+    train_config["training"]["fraction_background_non_matches"] = float(args.bg_frac)
+    train_config["training"]["fraction_masked_non_matches"] = float(args.bg_frac)
 
     # train
     train = DenseCorrespondenceTraining(dataset=dataset, config=train_config)
