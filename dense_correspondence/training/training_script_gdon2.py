@@ -21,6 +21,7 @@ def parse_args():
     parser.add_argument('--sampler', type=str, default='don')
     parser.add_argument('--mask-weight', type=int, default=1)
     parser.add_argument('--bg-weight', type=int, default=2)
+    parser.add_argument('--num-non-matches', type=int, default=150)
     return parser.parse_args()
 
 
@@ -54,6 +55,7 @@ if __name__ == '__main__':
 
 
     train_config["training"]["save_rate"] = 5000
+    train_config["training"]["num_non_matches_per_match"] = args.num_non_matches
     train_config["training"]["fraction_background_non_matches"] = float(args.bg_frac)
     train_config["training"]["fraction_masked_non_matches"] = float(args.bg_frac)
 
