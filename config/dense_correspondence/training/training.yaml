@@ -69,6 +69,8 @@ loss_function:
   num_samples: 150
   sampler:
     name: 'random'
+  upload_source_files:
+    - training.py
 
 logging:
   backend: 'neptune'
@@ -78,8 +80,9 @@ logging:
   description: 'This is example description'
   qualitative_evaluation_logging_rate: 500
   tags: # list as many tags you want. They intend to help you search/filter experiemnts
-    - 'general-dense-object-nets'
     - 'unknown_user'
-    - 'aploss'
-  upload_source_files:
-    - training.py
+
+evaluation:
+  num_image_pairs: 100
+  cross_scene: true
+  compute_descriptor_statistics: true
