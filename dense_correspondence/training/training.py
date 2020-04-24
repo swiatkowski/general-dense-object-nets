@@ -372,17 +372,17 @@ class DenseCorrespondenceTraining(object):
                     self.logger.log('blind_non_match_loss', x=i, y=blind_non_match_loss.item())
 
                 elif self._config['loss_function']['name'] == 'aploss':
-                    loss = loss_function(image_a_pred, image_b_pred, dataset_item, reliability_a, reliability_b)
+                    loss = loss_function.get_loss(image_a_pred, image_b_pred, dataset_item, reliability_a, reliability_b)
                     self.logger.log('loss', x=i, y=loss.item())
 
                 elif self._config['loss_function']['name'] == 'probabilistic_loss':
-                    loss = probabilistic_loss.get_loss(match_type,
-                                                       image_a_pred, image_b_pred,
-                                                       reliability_a, reliability_b,
-                                                       matches_a, matches_b,
-                                                       masked_non_matches_a, masked_non_matches_b,
-                                                       background_non_matches_a, background_non_matches_b,
-                                                       blind_non_matches_a, blind_non_matches_b)
+                    loss = loss_function.get_loss(match_type,
+                                                    image_a_pred, image_b_pred,
+                                                    reliability_a, reliability_b,
+                                                    matches_a, matches_b,
+                                                    masked_non_matches_a, masked_non_matches_b,
+                                                    background_non_matches_a, background_non_matches_b,
+                                                    blind_non_matches_a, blind_non_matches_b)
                     self.logger.log('loss', x=i, y=loss.item())
                 else:
                     raise NotImplementedError('loss function')
