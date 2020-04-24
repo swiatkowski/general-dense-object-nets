@@ -372,17 +372,29 @@ class DenseCorrespondenceTraining(object):
                     self.logger.log('blind_non_match_loss', x=i, y=blind_non_match_loss.item())
 
                 elif self._config['loss_function']['name'] == 'aploss':
-                    loss = loss_function.get_loss(image_a_pred, image_b_pred, dataset_item, reliability_a, reliability_b)
+                    ap_loss, ap_loss_with_reliability = loss_function.get_loss(image_a_pred, image_b_pred, dataset_item, reliability_a, reliability_b)
+                    loss = ap_loss_with_reliability
                     self.logger.log('loss', x=i, y=loss.item())
 
                 elif self._config['loss_function']['name'] == 'probabilistic_loss':
-                    loss = loss_function.get_loss(match_type,
+                    ap_loss_return = loss_function.get_loss(match_type,
                                                     image_a_pred, image_b_pred,
                                                     reliability_a, reliability_b,
                                                     matches_a, matches_b,
                                                     masked_non_matches_a, masked_non_matches_b,
                                                     background_non_matches_a, background_non_matches_b,
                                                     blind_non_matches_a, blind_non_matches_b)
+                    loss = ap_loss_return.loss
+                    if ap_loss_return.loss_with_reliability:
+                        loss = ap_loss_return.loss_with_reliability
+                        self.logger.log('loss without reliability',
+                                        x=i, y=ap_loss_return.loss.item())
+                        self.logger.log('max reliability for matches',
+                                        x=i, y=ap_loss_return.max_reliability.item())
+                        self.logger.log('min reliability for matches',
+                                        x=i, y=ap_loss_return.min_reliability.item())
+                        self.logger.log('mean reliability for matches',
+                                        x=i, y=ap_loss_return.mean_reliability.item())
                     self.logger.log('loss', x=i, y=loss.item())
                 else:
                     raise NotImplementedError('loss function')

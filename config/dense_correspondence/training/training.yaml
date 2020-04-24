@@ -64,13 +64,11 @@ loss_function:
   alpha_triplet: 0.1
   inner_radius: 20
   outter_radius: 30
-  num_negative_samples: 150
+  num_negative_samples: 150  # Deprecated
   nq: 25
   num_samples: 150
   sampler:
     name: 'random'
-  upload_source_files:
-    - training.py
 
 logging:
   backend: 'neptune'
@@ -81,6 +79,8 @@ logging:
   qualitative_evaluation_logging_rate: 500
   tags: # list as many tags you want. They intend to help you search/filter experiemnts
     - 'unknown_user'
+  upload_source_files:
+    - training.py
 
 evaluation:
   num_image_pairs: 100
