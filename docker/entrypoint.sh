@@ -50,6 +50,6 @@ build_maskrcnn_benchmark(){
 
 export -f build_maskrcnn_benchmark
 
-exec "$@"
+#exec "$@"
 
 cd $DC_SOURCE_DIR

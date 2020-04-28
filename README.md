@@ -68,6 +68,14 @@ ssh -N -L 8888:localhost:8888 <user>@entropy.mimuw.edu.pl
 For additional information refer to the document with the project description:
 https://docs.google.com/document/d/1Cq5LK8KdpZXHa9k9BCUp3NHovZnRnwo60e0jzbM_y18/edit?usp=sharing
 
+### Interactive running on entropy
+```bash
+Login node:
+srun --partition=common --qos=8gpu3d --gres=gpu:1 --cpus-per-task 8 --nodelist=asusgpu4 --pty bash
+Compute node:
+bash /results/$USER/general-dense-object-nets/singularity_exec.sh -i /results/$USER/gdon_latest.sif
+```
+
 ## AP Loss
 In training config file add some metadata for AP Loss and it's sampling strategy. Example:
 ```yaml
