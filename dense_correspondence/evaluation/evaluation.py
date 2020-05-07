@@ -2531,6 +2531,7 @@ class DenseCorrespondenceEvaluation(object):
             DCEP.run_on_single_dataframe_across_objects(across_object_csv, label="across_object", save=True)
 
         logging.info("Finished running evaluation on network")
+        dcn.train()
 
     @staticmethod
     def run_cross_instance_keypoint_evaluation_on_network(model_folder, path_to_cross_instance_labels,
