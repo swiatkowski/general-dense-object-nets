@@ -458,12 +458,13 @@ class DenseCorrespondenceTraining(object):
                     self.save_network(dcn, optimizer, loss_current_iteration, logging_dict=self._logging_dict, last_only=True)
 
                 if i % self._config["logging"]["qualitative_evaluation_logging_rate"] == 0:
-                    output_is_normalized = self._config['dense_correspondence_network']['normalize']
-                    evaluations = DCE.evaluate_network_qualitative_without_plotting(dcn, dataset=self.dataset, randomize=True, output_is_normalized=output_is_normalized)
-                    for e, _ in evaluations['train_evals']:
-                        self.logger.log('Train eval - iter {}'.format(i), e * 255.0, type='image')
-                    for e, _ in evaluations['test_evals']:
-                        self.logger.log('Test eval - iter {}'.format(i), e * 255.0, type='image')
+                    if self._config['dense_correspondence_network']['descriptor_dimension'] == 3:
+                        output_is_normalized = self._config['dense_correspondence_network']['normalize']
+                        evaluations = DCE.evaluate_network_qualitative_without_plotting(dcn, dataset=self.dataset, randomize=True, output_is_normalized=output_is_normalized)
+                        for e, _ in evaluations['train_evals']:
+                            self.logger.log('Train eval - iter {}'.format(i), e * 255.0, type='image')
+                        for e, _ in evaluations['test_evals']:
+                            self.logger.log('Test eval - iter {}'.format(i), e * 255.0, type='image')
 
                 if (i + 1) % self._config["logging"]["quantitative_evaluation_logging_rate"] == 0:
                     self.evaluate_quantitative(iteration=i, dcn=dcn)
