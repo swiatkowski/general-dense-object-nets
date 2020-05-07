@@ -4,9 +4,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 from collections import namedtuple
 
-APLossReturn = namedtuple('APLossReturn', ['loss', 'loss_with_reliability',
-                                           'max_reliability', 'min_reliability',
-                                           'mean_reliability'])
 
 # this class is taken from https://github.com/naver/r2d2/blob/master/nets/ap_loss.py
 class APLoss (nn.Module):
@@ -109,19 +106,18 @@ class PixelAPLoss(nn.Module):
         ap_score = self.aploss(scores, ground_truth)
         return ap_score
 
-    def get_loss(self, descriptors1, descriptors2, dataset_item, reliability1=None, reliability2=None):
+    def get_loss(self, descriptors1, descriptors2, dataset_item):
         ap_score = self(descriptors1, descriptors2, dataset_item)
         ap_loss = (1 - ap_score).mean()
-        if reliability1 is not None and reliability2 is not None:
-            reliability1 = reliability1[:, dataset_item.matches_a]
-            reliability2 = reliability2[:, dataset_item.matches_b]
-            average_reliability = (reliability1 + reliability2) / 2
-            ap_loss_with_reliability = \
-                (1 - ap_score * average_reliability +
-                 self._ap_threshold * (1 - average_reliability)).mean()
-            max_reliability = max(reliability1.max(), reliability2.max())
-            min_reliability = min(reliability1.min(), reliability2.min())
-            mean_reliability = average_reliability.mean()
-            return APLossReturn(ap_loss, ap_loss_with_reliability,
-                                max_reliability, min_reliability, mean_reliability)
-        return APLossReturn(ap_loss, None, None, None, None)
+        return ap_loss
+
+    def get_loss_with_reliability(
+            self, descriptors1, descriptors2, dataset_item, reliability1, reliability2):
+        ap_score = self(descriptors1, descriptors2, dataset_item)
+        ap_loss = (1 - ap_score).mean()
+        reliability1 = reliability1[:, dataset_item.matches_a]
+        reliability2 = reliability2[:, dataset_item.matches_b]
+        average_reliability = (reliability1 + reliability2) / 2
+        ap_loss_with_reliability = (1 - ap_score * average_reliability
+                                    + self._ap_threshold * (1 - average_reliability)).mean()
+        return ap_loss, ap_loss_with_reliability

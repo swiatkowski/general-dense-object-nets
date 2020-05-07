@@ -30,7 +30,7 @@ dataset = SpartanDataset(config=data_config)
 time_string = strftime('%d-%m-%Y_%X') # X=clock time ,%d day %m month %Y year
 train_config['training']['logging_dir_name'] = '{0}_{1}'.format(
     train_config['logging']['experiment'].replace(' ', '_'), time_string)
-train_config['logging']['tags'].append(train_config['training']['logging_dir_name'])
+# train_config['logging']['tags'].append(train_config['training']['logging_dir_name'])
 
 train = DenseCorrespondenceTraining(dataset=dataset, config=train_config)
 train.run()

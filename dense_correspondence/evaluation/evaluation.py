@@ -1248,7 +1248,8 @@ class DenseCorrespondenceEvaluation(object):
 
     @staticmethod
     def single_same_scene_image_pair_qualitative_analysis(dcn, dataset, scene_name, img_a_idx, img_b_idx,
-                                                          num_matches=10, output_is_normalized=True):
+                                                          num_matches=10, output_is_normalized=True,
+                                                          reliability_stats=None):
         """
         Wrapper for single_image_pair_qualitative_analysis, when images are from same scene.
 
@@ -1270,7 +1271,8 @@ class DenseCorrespondenceEvaluation(object):
         rgb_b, _, mask_b, _ = dataset.get_rgbd_mask_pose(scene_name, img_b_idx)
 
         return DenseCorrespondenceEvaluation.single_image_pair_qualitative_analysis(dcn, dataset, rgb_a, rgb_b, mask_a,
-                                                                                    mask_b, num_matches, output_is_normalized=output_is_normalized)
+                                                                                    mask_b, num_matches, output_is_normalized=output_is_normalized,
+                                                                                    reliability_stats=reliability_stats)
 
     @staticmethod
     def single_cross_scene_image_pair_qualitative_analysis(dcn, dataset, scene_name_a,
@@ -1390,7 +1392,9 @@ class DenseCorrespondenceEvaluation(object):
         return rgb_a, rgb_b
 
     @staticmethod
-    def single_image_pair_qualitative_analysis(dcn, dataset, rgb_a, rgb_b, mask_a, mask_b, num_matches, output_is_normalized=True):
+    def single_image_pair_qualitative_analysis(
+            dcn, dataset, rgb_a, rgb_b, mask_a, mask_b, num_matches,
+            output_is_normalized=True, reliability_stats=None):
         """
         Computes qualtitative assessment of DCN performance for a pair of
         images
@@ -1480,6 +1484,10 @@ class DenseCorrespondenceEvaluation(object):
             reliability_a, reliability_b = DenseCorrespondenceEvaluation.plot_reliability_maps(
                 reliability_a, reliability_b)
             reliability_maps = ReliabilityMap(reliability_a, reliability_b)
+
+            if reliability_stats:
+                reliability_stats.add_from_mask(reliability_a, mask_a)
+                reliability_stats.add_from_mask(reliability_b, mask_b)
         else:
             reliability_maps = None
         return ImagePairQualitativeResult(correspondence_image_pair, decriptors_images, reliability_maps)
@@ -2046,8 +2054,9 @@ class DenseCorrespondenceEvaluation(object):
         plt.show()
 
     @staticmethod
-    def evaluate_network_qualitative_without_plotting(dcn, dataset, num_image_pairs=5, randomize=False,
-                                                      scene_type=None, output_is_normalized=True):
+    def evaluate_network_qualitative_without_plotting(
+            dcn, dataset, num_image_pairs=5, randomize=False, scene_type=None,
+            output_is_normalized=True, reliability_stats=None):
         dcn.eval()
         # Train Data
         if randomize:
@@ -2080,7 +2089,8 @@ class DenseCorrespondenceEvaluation(object):
                                                                                                   scene_name,
                                                                                                   img_pair[0],
                                                                                                   img_pair[1],
-                                                                                                  output_is_normalized=output_is_normalized)
+                                                                                                  output_is_normalized=output_is_normalized,
+                                                                                                  reliability_stats=reliability_stats)
             train_results.append((res, comment))
 
         train_evals = DenseCorrespondenceEvaluation.combine_qualitative_evaluations(train_results)
