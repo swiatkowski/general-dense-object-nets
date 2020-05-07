@@ -465,6 +465,9 @@ class DenseCorrespondenceTraining(object):
                     for e, _ in evaluations['test_evals']:
                         self.logger.log('Test eval - iter {}'.format(i), e * 255.0, type='image')
 
+                if (i + 1) % self._config["logging"]["quantitative_evaluation_logging_rate"] == 0:
+                    self.evaluate_quantitative(iteration=i, dcn=dcn)
+
                 # don't compute the test loss on the first few times through the loop
                 if self._config["training"]["compute_test_loss"] and (loss_current_iteration % compute_test_loss_rate
                                                                       == 0) and loss_current_iteration > 5:
@@ -498,12 +501,12 @@ class DenseCorrespondenceTraining(object):
                     logging.info("Finished testing after %d iterations" % (max_num_iterations))
                     self.save_network(dcn, optimizer, loss_current_iteration, logging_dict=self._logging_dict,
                                       last_only=False)
-                    self.evaluate_quantitative(iteration=loss_current_iteration)
+                    self.evaluate_quantitative(iteration=loss_current_iteration, dcn=dcn)
                     self.logger.exit()
                     return
 
 
-    def evaluate_quantitative(self, iteration):
+    def evaluate_quantitative(self, iteration, dcn=None):
         DCE = DenseCorrespondenceEvaluation
         num_image_pairs = self._config['evaluation']['num_image_pairs']
         cross_scene = self._config['evaluation']['cross_scene']
@@ -514,20 +517,21 @@ class DenseCorrespondenceTraining(object):
             cross_scene=True,
             compute_descriptor_statistics=True,
             iteration=iteration,
-            dataset=self.dataset
+            dataset=self.dataset,
+            dcn=dcn
         )
 
         # train
         path_to_csv = os.path.join(self._logging_dir, "analysis/train/data.csv")
-        DCEP.log_metrics_from_dataframe(self.logger, path_to_csv, title_prefix='train')
+        DCEP.log_metrics_from_dataframe(self.logger, path_to_csv, title_prefix='train', title_suffix=str(iteration))
 
         # test
         path_to_csv = os.path.join(self._logging_dir, "analysis/test/data.csv")
-        DCEP.log_metrics_from_dataframe(self.logger, path_to_csv, title_prefix='test')
+        DCEP.log_metrics_from_dataframe(self.logger, path_to_csv, title_prefix='test', title_suffix=str(iteration))
 
         # eval
         path_to_csv = os.path.join(self._logging_dir, "analysis/cross_scene/data.csv")
-        DCEP.log_metrics_from_dataframe(self.logger, path_to_csv, title_prefix='eval')
+        DCEP.log_metrics_from_dataframe(self.logger, path_to_csv, title_prefix='eval', title_suffix=str(iteration))
 
     def setup_logging_dir(self):
         """
@@ -575,7 +579,7 @@ class DenseCorrespondenceTraining(object):
         """
         return self._logging_dir
 
-    def save_network(self, dcn, optimizer, iteration, logging_dict=None, last_only=False):
+    def save_network(self, dcn, optimizer, iteration, logging_dict=None, last_only=False, log_neptune=True):
         """
         Saves network parameters to logging directory
         :return:
@@ -591,12 +595,12 @@ class DenseCorrespondenceTraining(object):
         print('Saving to params to file: ', network_param_file)
 
         torch.save(dcn.state_dict(), network_param_file)
-        self.logger.log('Model state', x=network_param_file, type='file')
-
         torch.save(optimizer.state_dict(), optimizer_param_file)
-        self.logger.log('Optimizer state', x=optimizer_param_file, type='file')
 
-        self.logger.send_logs()
+        if log_neptune:
+            self.logger.log('Model state', x=network_param_file, type='file')
+            self.logger.log('Optimizer state', x=optimizer_param_file, type='file')
+            self.logger.send_logs()
 
     def save_configs(self):
         """
