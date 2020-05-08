@@ -565,15 +565,20 @@ class DenseCorrespondenceEvaluation(object):
             reliability_b = dc_plotting.normalize_descriptor(reliability_b, stats)
 
         if use_colormap:
-            # Scale values from [0, 1] to [0, 255] to apply colormap
-            reliability_a = (reliability_a * 255).astype(np.uint8)
-            reliability_b = (reliability_b * 255).astype(np.uint8)
-            # Convert to heatmap
-            reliability_a = cv2.applyColorMap(reliability_a, cv2.COLORMAP_HOT)
-            reliability_b = cv2.applyColorMap(reliability_b, cv2.COLORMAP_HOT)
-            # Scale back to [0, 1]
-            reliability_a /= 255
-            reliability_b /= 255
+            def apply_colormap(reliability):
+                # Scale values from [0, 1] to [0, 255] to apply colormap
+                reliability = (reliability * 255).astype(np.uint8)
+                # Convert to heatmap
+                reliability = cv2.applyColorMap(reliability, cv2.COLORMAP_JET)
+                # Convert from BGR used by OpenCV to RGB
+                reliability = cv2.cvtColor(reliability, cv2.COLOR_BGR2RGB)
+                # Scale back to [0, 1]
+                reliability = reliability.astype(float) / 255
+                return reliability
+
+            reliability_a = apply_colormap(reliability_a)
+            reliability_b = apply_colormap(reliability_b)
+
         else:  # use grayscale
             reliability_a = np.repeat(reliability_a[:, :, np.newaxis], 3, axis=2)
             reliability_b = np.repeat(reliability_b[:, :, np.newaxis], 3, axis=2)
