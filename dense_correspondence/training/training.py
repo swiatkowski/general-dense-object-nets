@@ -373,7 +373,7 @@ class DenseCorrespondenceTraining(object):
                     self.logger.log('blind_non_match_loss', x=i, y=blind_non_match_loss.item())
 
                 elif self._config['loss_function']['name'] == 'aploss':
-                    if reliability_a is not None and reliability_b is not None:
+                    if reliability_a is None and reliability_b is None:
                         loss = loss_function.get_loss(image_a_pred, image_b_pred, dataset_item)
                         self.logger.log('loss', x=i, y=loss.item())
                     else:
@@ -381,8 +381,9 @@ class DenseCorrespondenceTraining(object):
                             image_a_pred, image_b_pred,
                             dataset_item,
                             reliability_a, reliability_b)
+                        loss = ap_loss_with_reliability
                         self.logger.log('ap_loss', x=i, y=ap_loss.item())
-                        self.logger.log('loss', x=i, y=ap_loss_with_reliability.item())
+                        self.logger.log('loss', x=i, y=loss.item())
 
                 elif self._config['loss_function']['name'] == 'probabilistic_loss':
                     ap_loss_return = loss_function.get_loss(match_type,
@@ -411,7 +412,9 @@ class DenseCorrespondenceTraining(object):
                 optimizer.step()
 
                 if reliability_a is not None and reliability_b is not None:
-                    reliability_stats = ReliabilityStatistics('reliability_train_matches')
+                    create_histogram = i % 100 == 0
+                    reliability_stats = ReliabilityStatistics('reliability_train_matches',
+                                                              create_histogram=create_histogram)
                     reliability_stats.add_from_matches(reliability_a, matches_a)
                     reliability_stats.add_from_matches(reliability_b, matches_b)
                     reliability_stats.log(self.logger, i)
@@ -484,7 +487,8 @@ class DenseCorrespondenceTraining(object):
                     self.save_network(dcn, optimizer, loss_current_iteration, logging_dict=self._logging_dict, last_only=True)
 
                 if i % self._config["logging"]["qualitative_evaluation_logging_rate"] == 0:
-                    reliability_stats = ReliabilityStatistics('reliability_eval_mask')
+                    reliability_stats = ReliabilityStatistics('reliability_eval_mask',
+                                                              create_histogram=True)
                     output_is_normalized = self._config['dense_correspondence_network']['normalize']
                     evaluations = DCE.evaluate_network_qualitative_without_plotting(
                         dcn, dataset=self.dataset, randomize=True,

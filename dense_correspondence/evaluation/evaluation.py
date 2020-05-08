@@ -1481,13 +1481,13 @@ class DenseCorrespondenceEvaluation(object):
             reliability_a = reliability_a.data.cpu().numpy()
             reliability_b = reliability_b.data.cpu().numpy()
 
-            reliability_a, reliability_b = DenseCorrespondenceEvaluation.plot_reliability_maps(
-                reliability_a, reliability_b)
-            reliability_maps = ReliabilityMap(reliability_a, reliability_b)
-
             if reliability_stats:
                 reliability_stats.add_from_mask(reliability_a, mask_a)
                 reliability_stats.add_from_mask(reliability_b, mask_b)
+
+            reliability_a, reliability_b = DenseCorrespondenceEvaluation.plot_reliability_maps(
+                reliability_a, reliability_b)
+            reliability_maps = ReliabilityMap(reliability_a, reliability_b)
         else:
             reliability_maps = None
         return ImagePairQualitativeResult(correspondence_image_pair, decriptors_images, reliability_maps)
