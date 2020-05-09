@@ -119,5 +119,5 @@ class PixelAPLoss(nn.Module):
         reliability2 = reliability2[:, dataset_item.matches_b]
         average_reliability = (reliability1 + reliability2) / 2
         ap_loss_with_reliability = (1 - ap_score * average_reliability
-                                    + self._ap_threshold * (1 - average_reliability)).mean()
+                                    - self._ap_threshold * (1 - average_reliability)).mean()
         return ap_loss, ap_loss_with_reliability

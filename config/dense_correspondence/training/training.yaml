@@ -34,6 +34,7 @@ training:
   save_rate: 1000 # how often to save the network
   logging_dir_name: test # overwrites if this is here
   logging_dir: trained_models # where to store trained models
+  seed: null  # null for random seed or int
 
 dense_correspondence_network:
   descriptor_dimension: 3
@@ -47,7 +48,7 @@ dense_correspondence_network:
     # If Unet
     # currently no options supported
   head:
-    class: 'R2D2Net'  # options: {None, R2D2Net, ReliabilitySoftplus}
+    class: 'R2D2Net'  # options: {null, R2D2Net, ReliabilitySoftplus}
     add_conv: True    # This is an additional option for ReliabilitySoftplus net
 
 loss_function:
@@ -69,6 +70,7 @@ loss_function:
   num_samples: 150
   sampler:
     name: 'random'
+  ap_threshold: 0.5
 
 logging:
   backend: 'neptune'
@@ -77,6 +79,7 @@ logging:
   experiment: 'shoes'
   description: 'This is example description'
   qualitative_evaluation_logging_rate: 500
+  initial_qualitative_evaluation_logging_rate: 100
   tags: # list as many tags you want. They intend to help you search/filter experiemnts
     - 'unknown_user'
   upload_source_files:
