@@ -299,11 +299,13 @@ class DenseCorrespondenceTraining(object):
 
 
         total_time = time.time()
+        iteration=0
         for epoch in range(50):  # loop over the dataset multiple times
             for i, data in enumerate(self._data_loader, 0):
+                iteration += 1
                 loss_current_iteration += 1
-                self.logger.log('epoch', x=i, y=epoch)
-                self.logger.log('iteration', x=i, y=i)
+                self.logger.log('epoch', x=iteration, y=epoch)
+                self.logger.log('iteration', x=iteration, y=i)
 
                 iteration_time = time.time()
 
@@ -341,8 +343,8 @@ class DenseCorrespondenceTraining(object):
                 )
 
                 optimizer.zero_grad()
-                self.adjust_learning_rate(optimizer, loss_current_iteration)
-                self.logger.log('learning rate', x=i, y=self.get_learning_rate(optimizer))
+                self.adjust_learning_rate(optimizer, iteration)
+                self.logger.log('learning rate', x=iteration, y=self.get_learning_rate(optimizer))
 
                 # run both images through the network
                 image_a_pred_, reliability_a_ = dcn.forward(img_a)
@@ -365,15 +367,15 @@ class DenseCorrespondenceTraining(object):
                                                                                              background_non_matches_b,
                                                                                              blind_non_matches_a,
                                                                                              blind_non_matches_b)
-                    self.logger.log('loss', x=i, y=loss.item())
-                    self.logger.log('match_loss', x=i, y=match_loss.item())
-                    self.logger.log('masked_non_match_loss', x=i, y=masked_non_match_loss.item())
-                    self.logger.log('background_non_match_loss', x=i, y=background_non_match_loss.item())
-                    self.logger.log('blind_non_match_loss', x=i, y=blind_non_match_loss.item())
+                    self.logger.log('loss', x=iteration, y=loss.item())
+                    self.logger.log('match_loss', x=iteration, y=match_loss.item())
+                    self.logger.log('masked_non_match_loss', x=iteration, y=masked_non_match_loss.item())
+                    self.logger.log('background_non_match_loss', x=iteration, y=background_non_match_loss.item())
+                    self.logger.log('blind_non_match_loss', x=iteration, y=blind_non_match_loss.item())
 
                 elif self._config['loss_function']['name'] == 'aploss':
                     loss = loss_function.get_loss(image_a_pred, image_b_pred, dataset_item, reliability_a, reliability_b)
-                    self.logger.log('loss', x=i, y=loss.item())
+                    self.logger.log('loss', x=iteration, y=loss.item())
 
                 elif self._config['loss_function']['name'] == 'probabilistic_loss':
                     loss = loss_function.get_loss(match_type,
@@ -383,7 +385,7 @@ class DenseCorrespondenceTraining(object):
                                                     masked_non_matches_a, masked_non_matches_b,
                                                     background_non_matches_a, background_non_matches_b,
                                                     blind_non_matches_a, blind_non_matches_b)
-                    self.logger.log('loss', x=i, y=loss.item())
+                    self.logger.log('loss', x=iteration, y=loss.item())
                 else:
                     raise NotImplementedError('loss function')
 
@@ -391,8 +393,8 @@ class DenseCorrespondenceTraining(object):
                 optimizer.step()
 
                 elapsed = time.time() - iteration_time
-                self.logger.log('training iteration time', x=i, y=time.time() - iteration_time)
-                self.logger.log('total time', x=i, y=time.time() - total_time)
+                self.logger.log('training iteration time', x=iteration, y=time.time() - iteration_time)
+                self.logger.log('total time', x=iteration, y=time.time() - total_time)
 
                 def update_plots(loss, match_loss, masked_non_match_loss, background_non_match_loss, blind_non_match_loss):
                     """
@@ -453,25 +455,25 @@ class DenseCorrespondenceTraining(object):
 
                 update_plots(loss, match_loss, masked_non_match_loss, background_non_match_loss, blind_non_match_loss)
 
-                if loss_current_iteration % save_rate == 0:
-                    print("Saving model at iter: ", loss_current_iteration)
-                    self.save_network(dcn, optimizer, loss_current_iteration, logging_dict=self._logging_dict, last_only=True)
+                if iteration % save_rate == 0:
+                    print("Saving model at iter: ", iteration)
+                    self.save_network(dcn, optimizer, iteration, logging_dict=self._logging_dict, last_only=True)
 
-                if i % self._config["logging"]["qualitative_evaluation_logging_rate"] == 0:
+                if iteration % self._config["logging"]["qualitative_evaluation_logging_rate"] == 0:
                     if self._config['dense_correspondence_network']['descriptor_dimension'] == 3:
                         output_is_normalized = self._config['dense_correspondence_network']['normalize']
                         evaluations = DCE.evaluate_network_qualitative_without_plotting(dcn, dataset=self.dataset, randomize=True, output_is_normalized=output_is_normalized)
                         for e, _ in evaluations['train_evals']:
-                            self.logger.log('Train eval - iter {}'.format(i), e * 255.0, type='image')
+                            self.logger.log('Train eval - iter {}'.format(iteration), e * 255.0, type='image')
                         for e, _ in evaluations['test_evals']:
-                            self.logger.log('Test eval - iter {}'.format(i), e * 255.0, type='image')
+                            self.logger.log('Test eval - iter {}'.format(iteration), e * 255.0, type='image')
 
-                if (i + 1) % self._config["logging"]["quantitative_evaluation_logging_rate"] == 0:
-                    self.evaluate_quantitative(iteration=i, dcn=dcn)
+                if (iteration + 1) % self._config["logging"]["quantitative_evaluation_logging_rate"] == 0:
+                    self.evaluate_quantitative(iteration=iteration, dcn=dcn)
 
                 # don't compute the test loss on the first few times through the loop
-                if self._config["training"]["compute_test_loss"] and (loss_current_iteration % compute_test_loss_rate
-                                                                      == 0) and loss_current_iteration > 5:
+                if self._config["training"]["compute_test_loss"] and (iteration % compute_test_loss_rate
+                                                                      == 0) and iteration > 5:
                     logging.info("Computing test loss")
 
                     # delete the loss, match_loss, non_match_loss variables so that
@@ -524,15 +526,15 @@ class DenseCorrespondenceTraining(object):
 
         # train
         path_to_csv = os.path.join(self._logging_dir, "analysis/train/data.csv")
-        DCEP.log_metrics_from_dataframe(self.logger, path_to_csv, title_prefix='train', title_suffix=str(iteration))
+        DCEP.log_metrics_from_dataframe(self.logger, path_to_csv, title_prefix='train', iteration=iteration)
 
         # test
         path_to_csv = os.path.join(self._logging_dir, "analysis/test/data.csv")
-        DCEP.log_metrics_from_dataframe(self.logger, path_to_csv, title_prefix='test', title_suffix=str(iteration))
+        DCEP.log_metrics_from_dataframe(self.logger, path_to_csv, title_prefix='test', iteration=iteration)
 
         # eval
         path_to_csv = os.path.join(self._logging_dir, "analysis/cross_scene/data.csv")
-        DCEP.log_metrics_from_dataframe(self.logger, path_to_csv, title_prefix='eval', title_suffix=str(iteration))
+        DCEP.log_metrics_from_dataframe(self.logger, path_to_csv, title_prefix='eval', iteration=iteration)
 
     def setup_logging_dir(self):
         """
