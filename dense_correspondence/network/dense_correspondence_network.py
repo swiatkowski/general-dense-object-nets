@@ -21,7 +21,7 @@ from dense_correspondence.dataset.spartan_dataset_masked import SpartanDataset
 class DenseCorrespondenceNetwork(nn.Module):
     IMAGE_TO_TENSOR = valid_transform = transforms.Compose([transforms.ToTensor(), ])
 
-    def __init__(self, fcn, descriptor_dimension, image_width=640, image_height=480, normalize=True):
+    def __init__(self, fcn, descriptor_dimension, image_width=640, image_height=480, normalize=True, normalize_ball=False):
         """
         :param fcn:
         :type fcn:
@@ -52,6 +52,7 @@ class DenseCorrespondenceNetwork(nn.Module):
 
         self._descriptor_image_stats = None
         self._normalize = normalize
+        self._normalize_ball = normalize_ball
         self._constructed_from_model_folder = False
 
     @property
@@ -248,7 +249,11 @@ class DenseCorrespondenceNetwork(nn.Module):
             descriptors = self.fcn(img_tensor)
             reliability = None
 
-        if self._normalize:
+        if self._normalize_ball:
+            norm = torch.norm(descriptors, 2, 1) # [N,1,H,W]
+            longest_descriptor = torch.max(norm)
+            descriptors = descriptors / longest_descriptor
+        elif self._normalize:
             descriptors = F.normalize(descriptors, p=2, dim=1)
 
         return descriptors, reliability
@@ -412,10 +417,15 @@ class DenseCorrespondenceNetwork(nn.Module):
         else:
             normalize = False
 
+        if 'normalize_ball' in config:
+            normalize_ball = config['normalize_ball']
+        else:
+            normalize_ball = False
+
         dcn = DenseCorrespondenceNetwork(fcn, config['descriptor_dimension'],
                                          image_width=config['image_width'],
                                          image_height=config['image_height'],
-                                         normalize=normalize)
+                                         normalize=normalize, normalize_ball=normalize_ball)
 
         if load_stored_params:
             assert model_param_file is not None
