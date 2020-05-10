@@ -41,6 +41,7 @@ dense_correspondence_network:
   image_width: 640
   image_height: 480
   normalize: True
+  normalize_ball: True
   backbone:
     model_class: "Resnet"         # options: {Resnet, Unet}
     # If Resnet
