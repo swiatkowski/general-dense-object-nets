@@ -40,8 +40,7 @@ dense_correspondence_network:
   descriptor_dimension: 3
   image_width: 640
   image_height: 480
-  normalize: True
-  normalize_ball: True
+  normalize: True # normalizes to unit ball
   backbone:
     model_class: "Resnet"         # options: {Resnet, Unet}
     # If Resnet
