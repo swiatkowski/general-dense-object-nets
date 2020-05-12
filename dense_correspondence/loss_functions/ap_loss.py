@@ -80,10 +80,8 @@ class PixelAPLoss(nn.Module):
             selected_descriptors_1 = selected_descriptors_1.unsqueeze(0)
             selected_descriptors_2 = selected_descriptors_2.unsqueeze(0)
 
-        cosine_distance = (selected_descriptors_1 * selected_descriptors_2).sum(-1)
-        return cosine_distance
-        # l2_distance = torch.norm(selected_descriptors_1 - selected_descriptors_2, p=2, dim=-1)
-        # return 1 - l2_distance / 2 # truncate to [0, 1] space
+        l2_distance = torch.norm(selected_descriptors_1 - selected_descriptors_2, p=2, dim=-1)
+        return 1 - l2_distance / 2 # truncate to [0, 1] space
 
     def combine_scores(self, positive_scores, negative_scores):
         scores = torch.cat((positive_scores, negative_scores), dim=-1)
