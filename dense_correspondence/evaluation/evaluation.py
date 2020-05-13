@@ -622,7 +622,6 @@ class DenseCorrespondenceEvaluation(object):
 
             masked_normalized_descriptor1 = res_a_norm * mask_a_repeat
             masked_normalized_descriptor2 = res_b_norm * mask_b_repeat
-
         return DescriptorColormaps(res_a, res_b, res_a_norm, res_b_norm,
                                    masked_normalized_descriptor1 if plot_masked else None,
                                    masked_normalized_descriptor2 if plot_masked else None)
@@ -883,7 +882,7 @@ class DenseCorrespondenceEvaluation(object):
 
         DCE = DenseCorrespondenceEvaluation
 
-        sampled_idx_list = random_sample_from_masked_image(mask_a, num_uv_a_samples)
+        sampled_idx_list, num_uv_a_samples = random_sample_from_masked_image(mask_a, num_uv_a_samples)
         # If the list is empty, return an empty list
         if len(sampled_idx_list) == 0:
             return dataframe_list
@@ -1436,7 +1435,7 @@ class DenseCorrespondenceEvaluation(object):
         # note that this is in (x,y) format
         # TODO: if this mask is empty, this function will not be happy
         # de-prioritizing since this is only for qualitative evaluation plots
-        sampled_idx_list = random_sample_from_masked_image(mask_a, num_matches)
+        sampled_idx_list, num_matches = random_sample_from_masked_image(mask_a, num_matches)
         if len(sampled_idx_list) == 0:
             return None
 
@@ -2186,23 +2185,28 @@ class DenseCorrespondenceEvaluation(object):
         """
         data, comment = evaluation
         correspondence = data.correspondence
-        nd1 = data.descriptor_colormaps.normalized_descriptor1
-        nd2 = data.descriptor_colormaps.normalized_descriptor2
-        mnd1 = data.descriptor_colormaps.masked_normalized_descriptor1
-        mnd2 = data.descriptor_colormaps.masked_normalized_descriptor2
+        output_image = correspondence / 255.0
 
-        combined = np.concatenate((nd1, nd2), axis=1)
-        if mnd1 is not None:
-            combined_masked_descriptors = np.concatenate((mnd1, mnd2), axis=1)
-            combined = np.concatenate((combined, combined_masked_descriptors), axis=0)
+        if data.descriptor_colormaps:
+            nd1 = data.descriptor_colormaps.normalized_descriptor1
+            nd2 = data.descriptor_colormaps.normalized_descriptor2
+            mnd1 = data.descriptor_colormaps.masked_normalized_descriptor1
+            mnd2 = data.descriptor_colormaps.masked_normalized_descriptor2
+
+            combined_descriptors = np.concatenate((nd1, nd2), axis=1)
+            output_image = np.concatenate((output_image, combined_descriptors), axis=0)
+
+            if mnd1 is not None and mnd2 is not None:
+                combined_masked_descriptors = np.concatenate((mnd1, mnd2), axis=1)
+                output_image = np.concatenate((output_image, combined_masked_descriptors), axis=0)
 
         if data.reliability_maps is not None:
             rel1 = data.reliability_maps.reliability1
             rel2 = data.reliability_maps.reliability2
             combined_reliability_maps = np.concatenate((rel1, rel2), axis=1)
-            combined = np.concatenate((combined, combined_reliability_maps), axis=0)
+            output_image = np.concatenate((output_image, combined_reliability_maps), axis=0)
 
-        return (np.concatenate((correspondence / 255.0, combined), axis=0), comment)
+        return output_image, comment
 
     @staticmethod
     def compute_loss_on_dataset(dcn, data_loader, loss_config, num_iterations=500, ):

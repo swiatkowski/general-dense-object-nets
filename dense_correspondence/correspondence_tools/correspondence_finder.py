@@ -74,20 +74,25 @@ def random_sample_from_masked_image(img_mask, num_samples):
         - shape is H x W
     :param num_samples: int
         - number of random indices to return
-    :return: List of np.array
+    :return: List of np.array, size of these arrays (can be smaller than num_samples)
     """
     idx_tuple = img_mask.nonzero()
     num_nonzero = len(idx_tuple[0])
     if num_nonzero == 0:
         empty_list = []
-        return empty_list
+        return empty_list, 0
+    elif num_nonzero < num_samples:
+        # Number of samples is larger that the number of pixels on the mask.
+        # This is a rare case that causes an error in random.sample() below.
+        return idx_tuple, num_nonzero
+
     rand_inds = random.sample(range(0,num_nonzero), num_samples)
 
     sampled_idx_list = []
     for i, idx in enumerate(idx_tuple):
         sampled_idx_list.append(idx[rand_inds])
 
-    return sampled_idx_list
+    return sampled_idx_list, num_samples
 
 def random_sample_from_masked_image_torch(img_mask, num_samples):
     """

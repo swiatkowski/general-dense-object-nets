@@ -66,10 +66,17 @@ class DenseCorrespondenceTraining(object):
         :return:
         :rtype:
         """
+        self.set_seed()
         self.load_dataset()
         self.setup_logging_dir()
         self.setup_tensorboard()
 
+    def set_seed(self):
+        """Sets deterministic seed to pytorch and numpy for training."""
+        if 'seed' in self._config['training'] and self._config['training']['seed'] is not None:
+            print(self._config['training']['seed'])
+            torch.manual_seed(self._config['training']['seed'])
+            np.random.seed(self._config['training']['seed'])
 
     @property
     def dataset(self):
@@ -272,7 +279,9 @@ class DenseCorrespondenceTraining(object):
             num_samples = loss_function_config['num_samples']
             sampler = dispatch_sampler(loss_function_config['sampler'])
 
-            loss_function = PixelAPLoss(nq=nq, sampler=sampler, num_samples=num_samples)
+            loss_function = PixelAPLoss(
+                nq=nq, sampler=sampler, num_samples=num_samples,
+                ap_threshold=self._config['loss_function']['ap_threshold'])
             loss_function.cuda()
         elif self._config['loss_function']['name'] == 'probabilistic_loss':
             loss_function = ProbabilisticLoss(image_shape=dcn.image_shape, config=self._config['loss_function'])
@@ -411,14 +420,6 @@ class DenseCorrespondenceTraining(object):
                 loss.backward()
                 optimizer.step()
 
-                if reliability_a is not None and reliability_b is not None:
-                    create_histogram = i % 100 == 0
-                    reliability_stats = ReliabilityStatistics('reliability_train_matches',
-                                                              create_histogram=create_histogram)
-                    reliability_stats.add_from_matches(reliability_a, matches_a)
-                    reliability_stats.add_from_matches(reliability_b, matches_b)
-                    reliability_stats.log(self.logger, i)
-
                 elapsed = time.time() - iteration_time
                 self.logger.log('training iteration time', x=i, y=time.time() - iteration_time)
                 self.logger.log('total time', x=i, y=time.time() - total_time)
@@ -482,11 +483,19 @@ class DenseCorrespondenceTraining(object):
 
                 update_plots(loss, match_loss, masked_non_match_loss, background_non_match_loss, blind_non_match_loss)
 
+                if reliability_a is not None and reliability_b is not None:
+                    reliability_stats = ReliabilityStatistics(
+                        'reliability_train_matches',
+                        create_histogram=self.is_qualitative_evaluation_iteration(i))
+                    reliability_stats.add_from_matches(reliability_a, matches_a)
+                    reliability_stats.add_from_matches(reliability_b, matches_b)
+                    reliability_stats.log(self.logger, i)
+
                 if loss_current_iteration % save_rate == 0:
                     print("Saving model at iter: ", loss_current_iteration)
                     self.save_network(dcn, optimizer, loss_current_iteration, logging_dict=self._logging_dict, last_only=True)
 
-                if i % self._config["logging"]["qualitative_evaluation_logging_rate"] == 0:
+                if self.is_qualitative_evaluation_iteration(i):
                     reliability_stats = ReliabilityStatistics('reliability_eval_mask',
                                                               create_histogram=True)
                     output_is_normalized = self._config['dense_correspondence_network']['normalize']
@@ -537,6 +546,12 @@ class DenseCorrespondenceTraining(object):
                     self.logger.exit()
                     return
 
+    def is_qualitative_evaluation_iteration(self, iteration):
+        # Create qualitative evaluation more often at the beginning of the training.
+        if iteration < self._config["logging"]["qualitative_evaluation_logging_rate"]:
+            return iteration % \
+                   self._config["logging"]["initial_qualitative_evaluation_logging_rate"] == 0
+        return iteration % self._config["logging"]["qualitative_evaluation_logging_rate"] == 0
 
     def evaluate_quantitative(self, iteration):
         DCE = DenseCorrespondenceEvaluation
