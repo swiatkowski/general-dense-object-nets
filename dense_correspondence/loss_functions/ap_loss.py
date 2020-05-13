@@ -2,6 +2,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from collections import namedtuple
+
 
 # this class is taken from https://github.com/naver/r2d2/blob/master/nets/ap_loss.py
 class APLoss (nn.Module):
@@ -60,13 +62,13 @@ class PixelAPLoss(nn.Module):
     """
     Computes the pixel-wise AP loss
     """
-    def __init__(self, nq=20, sampler=None, num_samples=80, kappa=0):
-        assert 0 <= kappa <= 1
+    def __init__(self, nq=20, sampler=None, num_samples=80, ap_threshold=0.5):
+        assert 0 <= ap_threshold <= 1
         nn.Module.__init__(self)
         self.aploss = APLoss(nq, min=0, max=1)
         self.sampler = sampler
         self.num_samples = num_samples
-        self._kappa = kappa
+        self._ap_threshold = ap_threshold
 
     def compute_scores(self, descriptors1, descriptors2, indices_1, indices_2):
         selected_descriptors_1 = descriptors1[:, indices_1, :]
@@ -104,20 +106,18 @@ class PixelAPLoss(nn.Module):
         ap_score = self.aploss(scores, ground_truth)
         return ap_score
 
-        # [WIP]
-        # this line shuld be changed if you want get more funky with ap loss
-        # for instance if you want to add reliabiliy map do sth like:
-        # 1 - ap_score * rel
-        # ap_loss = 1 - ap_score
-        # return ap_loss.mean()
-
-    def get_loss(self, descriptors1, descriptors2, dataset_item, reliability1=None, reliability2=None):
+    def get_loss(self, descriptors1, descriptors2, dataset_item):
         ap_score = self(descriptors1, descriptors2, dataset_item)
-        if reliability1 is None or reliability2 is None:
-            ap_loss = 1 - ap_score
-        else:
-            reliability1 = reliability1[:, dataset_item.matches_a]
-            reliability2 = reliability2[:, dataset_item.matches_b]
-            average_reliability = (reliability1 + reliability2) / 2
-            ap_loss = 1 - ap_score * average_reliability + self._kappa * (1 - average_reliability)
-        return ap_loss.mean()
+        ap_loss = (1 - ap_score).mean()
+        return ap_loss
+
+    def get_loss_with_reliability(
+            self, descriptors1, descriptors2, dataset_item, reliability1, reliability2):
+        ap_score = self(descriptors1, descriptors2, dataset_item)
+        ap_loss = (1 - ap_score).mean()
+        reliability1 = reliability1[:, dataset_item.matches_a]
+        reliability2 = reliability2[:, dataset_item.matches_b]
+        average_reliability = (reliability1 + reliability2) / 2
+        ap_loss_with_reliability = (1 - ap_score * average_reliability
+                                    + self._ap_threshold * (1 - average_reliability)).mean()
+        return ap_loss, ap_loss_with_reliability

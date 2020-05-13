@@ -42,6 +42,7 @@ from dense_correspondence.evaluation.evaluation import DenseCorrespondenceEvalua
 from dense_correspondence.evaluation.evaluation import DenseCorrespondenceEvaluationPlotter as DCEP
 from dense_correspondence.evaluation.plotting import normalize_descriptor
 from dense_correspondence.logging.dispatcher import dispatch_logger
+from dense_correspondence.logging.reliability_statistics import ReliabilityStatistics
 
 from dense_correspondence.loss_functions.probabilistic_loss import ProbabilisticLoss
 
@@ -372,23 +373,51 @@ class DenseCorrespondenceTraining(object):
                     self.logger.log('blind_non_match_loss', x=i, y=blind_non_match_loss.item())
 
                 elif self._config['loss_function']['name'] == 'aploss':
-                    loss = loss_function.get_loss(image_a_pred, image_b_pred, dataset_item, reliability_a, reliability_b)
-                    self.logger.log('loss', x=i, y=loss.item())
+                    if reliability_a is None and reliability_b is None:
+                        loss = loss_function.get_loss(image_a_pred, image_b_pred, dataset_item)
+                        self.logger.log('loss', x=i, y=loss.item())
+                    else:
+                        ap_loss, ap_loss_with_reliability = loss_function.get_loss_with_reliability(
+                            image_a_pred, image_b_pred,
+                            dataset_item,
+                            reliability_a, reliability_b)
+                        loss = ap_loss_with_reliability
+                        self.logger.log('ap_loss', x=i, y=ap_loss.item())
+                        self.logger.log('loss', x=i, y=loss.item())
 
                 elif self._config['loss_function']['name'] == 'probabilistic_loss':
-                    loss = loss_function.get_loss(match_type,
+                    ap_loss_return = loss_function.get_loss(match_type,
                                                     image_a_pred, image_b_pred,
                                                     reliability_a, reliability_b,
                                                     matches_a, matches_b,
                                                     masked_non_matches_a, masked_non_matches_b,
                                                     background_non_matches_a, background_non_matches_b,
                                                     blind_non_matches_a, blind_non_matches_b)
+                    loss = ap_loss_return.loss
+                    if ap_loss_return.loss_with_reliability:
+                        loss = ap_loss_return.loss_with_reliability
+                        self.logger.log('loss without reliability',
+                                        x=i, y=ap_loss_return.loss.item())
+                        self.logger.log('max reliability for matches',
+                                        x=i, y=ap_loss_return.max_reliability.item())
+                        self.logger.log('min reliability for matches',
+                                        x=i, y=ap_loss_return.min_reliability.item())
+                        self.logger.log('mean reliability for matches',
+                                        x=i, y=ap_loss_return.mean_reliability.item())
                     self.logger.log('loss', x=i, y=loss.item())
                 else:
                     raise NotImplementedError('loss function')
 
                 loss.backward()
                 optimizer.step()
+
+                if reliability_a is not None and reliability_b is not None:
+                    create_histogram = i % 100 == 0
+                    reliability_stats = ReliabilityStatistics('reliability_train_matches',
+                                                              create_histogram=create_histogram)
+                    reliability_stats.add_from_matches(reliability_a, matches_a)
+                    reliability_stats.add_from_matches(reliability_b, matches_b)
+                    reliability_stats.log(self.logger, i)
 
                 elapsed = time.time() - iteration_time
                 self.logger.log('training iteration time', x=i, y=time.time() - iteration_time)
@@ -458,12 +487,18 @@ class DenseCorrespondenceTraining(object):
                     self.save_network(dcn, optimizer, loss_current_iteration, logging_dict=self._logging_dict, last_only=True)
 
                 if i % self._config["logging"]["qualitative_evaluation_logging_rate"] == 0:
+                    reliability_stats = ReliabilityStatistics('reliability_eval_mask',
+                                                              create_histogram=True)
                     output_is_normalized = self._config['dense_correspondence_network']['normalize']
-                    evaluations = DCE.evaluate_network_qualitative_without_plotting(dcn, dataset=self.dataset, randomize=True, output_is_normalized=output_is_normalized)
+                    evaluations = DCE.evaluate_network_qualitative_without_plotting(
+                        dcn, dataset=self.dataset, randomize=True,
+                        output_is_normalized=output_is_normalized,
+                        reliability_stats=reliability_stats)
                     for e, _ in evaluations['train_evals']:
                         self.logger.log('Train eval - iter {}'.format(i), e * 255.0, type='image')
                     for e, _ in evaluations['test_evals']:
                         self.logger.log('Test eval - iter {}'.format(i), e * 255.0, type='image')
+                    reliability_stats.log(self.logger, i)
 
                 # don't compute the test loss on the first few times through the loop
                 if self._config["training"]["compute_test_loss"] and (loss_current_iteration % compute_test_loss_rate

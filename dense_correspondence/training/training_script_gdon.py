@@ -27,7 +27,8 @@ train_config = utils.getDictFromYamlFilename(train_config_file)
 data_config = utils.getDictFromYamlFilename(data_config_file)
 dataset = SpartanDataset(config=data_config)
 
-time_string = strftime('%d-%m-%Y_%X') # X=clock time ,%d day %m month %Y year
+# Cannot use %X. Neptune doesn't accept colons in tags.
+time_string = strftime('%d-%m-%Y_%H-%M-%S')  # %X=clock time (%H:%M:%S), %d day, %m month, %Y year
 train_config['training']['logging_dir_name'] = '{0}_{1}'.format(
     train_config['logging']['experiment'].replace(' ', '_'), time_string)
 train_config['logging']['tags'].append(train_config['training']['logging_dir_name'])
