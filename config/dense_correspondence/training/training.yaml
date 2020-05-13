@@ -34,7 +34,7 @@ training:
   save_rate: 1000 # how often to save the network
   logging_dir_name: test # overwrites if this is here
   logging_dir: trained_models # where to store trained models
-  seed: null  # null for random seed or int
+  seed: null  # seed to pytorch and numpy (null for random seed or int for deterministic)
 
 dense_correspondence_network:
   descriptor_dimension: 3

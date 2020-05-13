@@ -72,6 +72,7 @@ class DenseCorrespondenceTraining(object):
         self.setup_tensorboard()
 
     def set_seed(self):
+        """Sets deterministic seed to pytorch and numpy for training."""
         if 'seed' in self._config['training'] and self._config['training']['seed'] is not None:
             print(self._config['training']['seed'])
             torch.manual_seed(self._config['training']['seed'])
