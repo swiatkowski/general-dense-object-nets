@@ -385,13 +385,16 @@ class DenseCorrespondenceTraining(object):
                         loss = loss_function.get_loss(image_a_pred, image_b_pred, dataset_item)
                         self.logger.log('loss', x=i, y=loss.item())
                     else:
-                        ap_loss, ap_loss_with_reliability = loss_function.get_loss_with_reliability(
-                            image_a_pred, image_b_pred,
-                            dataset_item,
-                            reliability_a, reliability_b)
-                        loss = ap_loss_with_reliability
-                        self.logger.log('ap_loss', x=i, y=ap_loss.item())
+                        loss, ap_loss, ap_score_mean, ap_score_reliability_mean, reliability_penalty_mean = \
+                            loss_function.get_loss_with_reliability(
+                                image_a_pred, image_b_pred,
+                                dataset_item,
+                                reliability_a, reliability_b)
                         self.logger.log('loss', x=i, y=loss.item())
+                        self.logger.log('ap_loss', x=i, y=ap_loss.item())
+                        self.logger.log('ap_score_mean', x=i, y=ap_score_mean.item())
+                        self.logger.log('ap_score_reliability_mean', x=i, y=ap_score_reliability_mean.item())
+                        self.logger.log('reliability_penalty_mean', x=i, y=reliability_penalty_mean.item())
 
                 elif self._config['loss_function']['name'] == 'probabilistic_loss':
                     ap_loss_return = loss_function.get_loss(match_type,

@@ -114,10 +114,16 @@ class PixelAPLoss(nn.Module):
     def get_loss_with_reliability(
             self, descriptors1, descriptors2, dataset_item, reliability1, reliability2):
         ap_score = self(descriptors1, descriptors2, dataset_item)
-        ap_loss = (1 - ap_score).mean()
         reliability1 = reliability1[:, dataset_item.matches_a]
         reliability2 = reliability2[:, dataset_item.matches_b]
         average_reliability = (reliability1 + reliability2) / 2
+        # Actual loss
         ap_loss_with_reliability = (1 - ap_score * average_reliability
                                     - self._ap_threshold * (1 - average_reliability)).mean()
-        return ap_loss, ap_loss_with_reliability
+
+        # These are just stats for logging.
+        ap_score_mean = ap_score.mean()
+        ap_loss = 1 - ap_score_mean
+        ap_score_reliability_mean = (ap_score * average_reliability).mean()
+        reliability_penalty_mean = (self._ap_threshold * (1 - average_reliability)).mean()
+        return ap_loss_with_reliability, ap_loss, ap_score_mean, ap_score_reliability_mean, reliability_penalty_mean
