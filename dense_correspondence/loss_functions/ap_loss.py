@@ -62,13 +62,14 @@ class PixelAPLoss(nn.Module):
     """
     Computes the pixel-wise AP loss
     """
-    def __init__(self, nq=20, sampler=None, num_samples=80, ap_threshold=0.5):
+    def __init__(self, nq=20, sampler=None, num_samples=80, ap_threshold=0.5, similarity_measure='L2'):
         assert 0 <= ap_threshold <= 1
         nn.Module.__init__(self)
         self.aploss = APLoss(nq, min=0, max=1)
         self.sampler = sampler
         self.num_samples = num_samples
         self._ap_threshold = ap_threshold
+        self.similarity_measure = similarity_measure
 
     def compute_scores(self, descriptors1, descriptors2, indices_1, indices_2):
         selected_descriptors_1 = descriptors1[:, indices_1, :]
@@ -82,6 +83,16 @@ class PixelAPLoss(nn.Module):
             selected_descriptors_1 = selected_descriptors_1.unsqueeze(0)
             selected_descriptors_2 = selected_descriptors_2.unsqueeze(0)
 
+        if self.similarity_measure == 'cosine_similarity':
+            return self.compute_cosine_similarity(selected_descriptors_1, selected_descriptors_2)
+        elif self.similarity_measure == 'L2_similarity':
+            return self.compute_l2_similarity(selected_descriptors_1, selected_descriptors_2)
+
+    def compute_cosine_similarity(self, selected_descriptors_1, selected_descriptors_2):
+        cosine_similarity = (selected_descriptors_1 * selected_descriptors_2).sum(-1)
+        return cosine_similarity
+
+    def compute_l2_similarity(self, selected_descriptors_1, selected_descriptors_2):
         l2_distance = torch.norm(selected_descriptors_1 - selected_descriptors_2, p=2, dim=-1)
         return 1 - l2_distance / 2 # truncate to [0, 1] space
 

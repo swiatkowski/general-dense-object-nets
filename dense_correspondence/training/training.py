@@ -275,13 +275,15 @@ class DenseCorrespondenceTraining(object):
             loss_function = pixelwise_contrastive_loss
         elif self._config['loss_function']['name'] == 'aploss':
             loss_function_config = self._config['loss_function']
+            similarity_measure = loss_function_config['similarity_measure']
             nq = loss_function_config['nq']
             num_samples = loss_function_config['num_samples']
             sampler = dispatch_sampler(loss_function_config['sampler'])
 
             loss_function = PixelAPLoss(
                 nq=nq, sampler=sampler, num_samples=num_samples,
-                ap_threshold=self._config['loss_function']['ap_threshold'])
+                ap_threshold=self._config['loss_function']['ap_threshold'],
+                similarity_measure=similarity_measure)
             loss_function.cuda()
         elif self._config['loss_function']['name'] == 'probabilistic_loss':
             loss_function = ProbabilisticLoss(image_shape=dcn.image_shape, config=self._config['loss_function'])
