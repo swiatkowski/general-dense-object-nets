@@ -2452,9 +2452,10 @@ class DenseCorrespondenceEvaluation(object):
             if not os.path.isdir(dir):
                 os.makedirs(dir)
 
-        dcn.config["path_to_network_params_folder"] = model_folder
         if dcn is None:
             dcn = DenseCorrespondenceNetwork.from_model_folder(model_folder, iteration=iteration)
+        else:
+            dcn.config["path_to_network_params_folder"] = model_folder
         dcn.eval()
 
         if dataset is None:
@@ -2803,7 +2804,7 @@ class DenseCorrespondenceEvaluationPlotter(object):
     def log_aac(logger, df, metric_name, title, iteration):
         DCEP = DenseCorrespondenceEvaluationPlotter
         aac = DCEP.compute_area_above_curve(df, metric_name)
-        logger.log(title, x=iteration, y=aac)
+        logger.log('aac_'+title, x=iteration, y=aac)
         logger.send_logs()
 
     @staticmethod
