@@ -39,7 +39,7 @@ dense_correspondence_network:
   descriptor_dimension: 3
   image_width: 640
   image_height: 480
-  normalize: True # normalizes to unit ball
+  normalize: 'unit_ball' # chocie: 'unit_ball', 'unit_sphere', None
   backbone:
     model_class: "Resnet"         # options: {Resnet, Unet}
     # If Resnet
@@ -52,6 +52,7 @@ dense_correspondence_network:
 
 loss_function:
   name: 'aploss'  # pixelwise_contrastive_loss
+  similarity_measure: 'L2_similarity' # choice: 'L2_similarity' or 'cosine_similarity'
   M_masked: 0.5 # margin for masked non-match descriptor distance
   M_background: 0.5 # margin for background
   M_pixel: 50 # Clamp for pixel distance
