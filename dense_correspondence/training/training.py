@@ -502,7 +502,8 @@ class DenseCorrespondenceTraining(object):
                 if self.is_qualitative_evaluation_iteration(iteration):
                     reliability_stats = ReliabilityStatistics('reliability_eval_mask',
                                                               create_histogram=True)
-                    output_is_normalized = self._config['dense_correspondence_network']['normalize']
+                    normalization = self._config['dense_correspondence_network']['normalize']
+                    output_is_normalized = normalization is not None
                     evaluations = DCE.evaluate_network_qualitative_without_plotting(
                         dcn, dataset=self.dataset, randomize=True,
                         output_is_normalized=output_is_normalized,
@@ -511,7 +512,8 @@ class DenseCorrespondenceTraining(object):
                         self.logger.log('Train eval - iter {}'.format(iteration), e * 255.0, type='image')
                     for e, _ in evaluations['test_evals']:
                         self.logger.log('Test eval - iter {}'.format(iteration), e * 255.0, type='image')
-                    reliability_stats.log(self.logger, iteration)
+                    if reliability_a is not None and reliability_b is not None:
+                        reliability_stats.log(self.logger, iteration)
 
                 if (iteration + 1) % self._config["logging"]["quantitative_evaluation_logging_rate"] == 0:
                     self.evaluate_quantitative(iteration=iteration, dcn=dcn)
