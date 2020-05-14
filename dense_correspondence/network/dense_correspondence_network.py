@@ -21,7 +21,7 @@ from dense_correspondence.dataset.spartan_dataset_masked import SpartanDataset
 class DenseCorrespondenceNetwork(nn.Module):
     IMAGE_TO_TENSOR = valid_transform = transforms.Compose([transforms.ToTensor(), ])
 
-    def __init__(self, fcn, descriptor_dimension, image_width=640, image_height=480, normalize=True):
+    def __init__(self, fcn, descriptor_dimension, image_width=640, image_height=480, normalize='unit_ball'):
         """
         :param fcn:
         :type fcn:
@@ -248,7 +248,11 @@ class DenseCorrespondenceNetwork(nn.Module):
             descriptors = self.fcn(img_tensor)
             reliability = None
 
-        if self._normalize:
+        if self._normalize == 'unit_ball':
+            norm = torch.norm(descriptors, 2, 1) # [N,1,H,W]
+            longest_descriptor = torch.max(norm)
+            descriptors = descriptors / longest_descriptor
+        elif self._normalize == 'unit_sphere':
             descriptors = F.normalize(descriptors, p=2, dim=1)
 
         return descriptors, reliability
