@@ -27,8 +27,6 @@ training:
     DIFFERENT_OBJECT: 0
     MULTI_OBJECT: 0
     SYNTHETIC_MULTI_OBJECT: 0
-  # Loss function config
-  loss_function: pixelwise_contrastive_loss # not currently used
   # Logging config
   logging_rate: 100 # how often to print out
   save_rate: 1000 # how often to save the network
