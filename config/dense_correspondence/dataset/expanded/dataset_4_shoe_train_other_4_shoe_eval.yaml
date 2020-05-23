@@ -1,0 +1,66 @@
+logs_root_path: logs_proto
+multi_object:
+  evaluation_labeled_data_path: []
+  test: []
+  train: []
+single_object:
+  shoe_fashion_or_sport_white:
+    evaluation_labeled_data_path:
+    - evaluation_labeled_data/shoe_brown_boot.yaml
+    logs_root_path: logs_proto
+    object_id: shoe_fashion_or_sport_white
+    test:
+    - 2018-11-16-20-39-26
+    - 2018-11-16-20-44-48
+    - 2018-11-16-20-49-30
+    - 2018-11-16-20-54-16
+    train:
+    - 2018-11-16-20-39-26
+    - 2018-11-16-20-44-48
+    - 2018-11-16-20-49-30
+    - 2018-11-16-20-54-16
+  shoe_globalwin_blue_grey:
+    evaluation_labeled_data_path:
+    - evaluation_labeled_data/shoe_gray_nike.yaml
+    logs_root_path: logs_proto
+    object_id: shoe_globalwin_blue_grey
+    test:
+    - 2018-11-16-19-23-06
+    - 2018-11-16-20-22-29
+    - 2018-11-16-20-28-22
+    - 2018-11-16-20-33-21
+    train:
+    - 2018-11-16-19-23-06
+    - 2018-11-16-20-22-29
+    - 2018-11-16-20-28-22
+    - 2018-11-16-20-33-21
+  shoe_globalwin_light_brown:
+    evaluation_labeled_data_path:
+    - evaluation_labeled_data/shoe_green_nike.yaml
+    logs_root_path: logs_proto
+    object_id: shoe_globalwin_light_brown
+    test:
+    - 2018-11-16-17-31-50
+    - 2018-11-16-17-43-27
+    - 2018-11-16-17-51-12
+    - 2018-11-16-17-57-22
+    train:
+    - 2018-11-16-17-31-50
+    - 2018-11-16-17-43-27
+    - 2018-11-16-17-51-12
+    - 2018-11-16-17-57-22
+  shoe_tesla_maroon:
+    evaluation_labeled_data_path:
+    - evaluation_labeled_data/shoe_red_nike.yaml
+    logs_root_path: logs_proto
+    object_id: shoe_tesla_maroon
+    test:
+    - 2018-11-16-18-03-13
+    - 2018-11-16-19-03-23
+    - 2018-11-16-19-08-44
+    - 2018-11-16-19-14-26
+    train:
+    - 2018-11-16-18-03-13
+    - 2018-11-16-19-03-23
+    - 2018-11-16-19-08-44
+    - 2018-11-16-19-14-26
