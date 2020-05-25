@@ -30,6 +30,7 @@ class ReliabilityStatistics:
             figure = self._compute_histogram(values, x)
             name = '{}_histogram'.format(self.name_prefix)
             logger.log(name, x, figure, type='image')
+            plt.close(figure)
 
     @staticmethod
     def _compute_stats(values):
