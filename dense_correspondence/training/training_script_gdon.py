@@ -25,7 +25,10 @@ data_config_file = os.path.join(utils.getDenseCorrespondenceSourceDir(), sys.arg
 
 train_config = utils.getDictFromYamlFilename(train_config_file)
 data_config = utils.getDictFromYamlFilename(data_config_file)
-dataset = SpartanDataset(config=data_config)
+if '/expanded/' in data_config_file:
+    dataset = SpartanDataset(config_expanded=data_config)
+else:
+    dataset = SpartanDataset(config=data_config)
 
 # Cannot use %X. Neptune doesn't accept colons in tags.
 time_string = strftime('%d-%m-%Y_%H-%M-%S')  # %X=clock time (%H:%M:%S), %d day, %m month, %Y year
