@@ -251,7 +251,7 @@ class DenseCorrespondenceNetwork(nn.Module):
         elif self._normalize == 'unit_sphere':
             descriptors = F.normalize(descriptors, p=2, dim=1)
 
-        return NetworkOutput(descriptors, output.reliability, output.reliability)
+        return NetworkOutput(descriptors, output.reliability, output.repeatability)
 
     def forward_single_image_tensor(self, img_tensor):
         """
@@ -628,10 +628,12 @@ class R2D2Net(nn.Module):
         self.repeatability_layer = None
         self.num_outputs = 1
         if reliability:
+            print('reliability ON')
             self.reliability_layer = nn.Conv2d(
                 in_channels=descriptor_dimension, out_channels=2, kernel_size=1)
             self.num_outputs += 1
         if repeatability:
+            print('repeatability ON')
             self.repeatability_layer = nn.Conv2d(
                 in_channels=descriptor_dimension, out_channels=2, kernel_size=1)
             self.num_outputs += 1

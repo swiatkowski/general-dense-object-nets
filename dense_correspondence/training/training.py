@@ -392,18 +392,32 @@ class DenseCorrespondenceTraining(object):
                 elif self._config['loss_function']['name'] == 'aploss':
                     if reliability_a is None and reliability_b is None:
                         loss = loss_function.get_loss(image_a_pred, image_b_pred, dataset_item)
-                        self.logger.log('loss', x=iteration, y=loss.item())
+                        self.logger.log('ap_loss', x=iteration, y=loss.item())
                     else:
                         loss, ap_loss, ap_score_mean, ap_score_reliability_mean, reliability_penalty_mean = \
                             loss_function.get_loss_with_reliability(
                                 image_a_pred, image_b_pred,
                                 dataset_item,
                                 reliability_a, reliability_b)
-                        self.logger.log('loss', x=iteration, y=loss.item())
+                        self.logger.log('ap_loss_reliability', x=iteration, y=loss.item())
                         self.logger.log('ap_loss', x=iteration, y=ap_loss.item())
                         self.logger.log('ap_score_mean', x=iteration, y=ap_score_mean.item())
                         self.logger.log('ap_score_reliability_mean', x=iteration, y=ap_score_reliability_mean.item())
                         self.logger.log('reliability_penalty_mean', x=iteration, y=reliability_penalty_mean.item())
+
+                        # Add loss from repeatability
+                    if self._config['dense_correspondence_network']['head']['class'] and \
+                        self._config['dense_correspondence_network']['head']['repeatability']:
+                        repeatability_loss, cosine_loss, peaky_loss = RepeatabilityLoss.get_loss(
+                            repeatability_a, repeatability_b, dataset_item
+                        )
+                        self.logger.log('repeatability_loss', x=iteration,
+                                        y=repeatability_loss.item())
+                        self.logger.log('cosine_loss', x=iteration, y=cosine_loss.item())
+                        self.logger.log('peaky_loss', x=iteration, y=peaky_loss.item())
+                        loss += repeatability_loss
+
+                    self.logger.log('loss', x=iteration, y=loss.item())
 
                 elif self._config['loss_function']['name'] == 'probabilistic_loss':
                     loss = loss_function.get_loss(match_type,
@@ -416,21 +430,6 @@ class DenseCorrespondenceTraining(object):
                     self.logger.log('loss', x=iteration, y=loss.item())
                 else:
                     raise NotImplementedError('loss function')
-
-                # Add loss from repeatability
-                if self._config['dense_correspondence_network']['head']['class'] and \
-                        self._config['dense_correspondence_network']['head']['repeatability']:
-                    repeatability_loss, cosine_loss, peaky_loss = RepeatabilityLoss.get_loss(
-                        repeatability_a, repeatability_b, dataset_item
-                    )
-                    self.logger.log('repeatability_loss', x=iteration, y=repeatability_loss.item())
-                    self.logger.log('cosine_loss', x=iteration, y=cosine_loss.item())
-                    self.logger.log('peaky_loss', x=iteration, y=peaky_loss.item())
-                    print(loss.shape)
-                    print(loss)
-                    print(repeatability_loss.shape)
-                    print(repeatability_loss)
-                    loss += repeatability_loss
 
                 loss.backward()
                 optimizer.step()
