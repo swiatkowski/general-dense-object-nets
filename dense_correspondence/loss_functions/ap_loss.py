@@ -1,8 +1,6 @@
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-from collections import namedtuple
 
 
 # this class is taken from https://github.com/naver/r2d2/blob/master/nets/ap_loss.py

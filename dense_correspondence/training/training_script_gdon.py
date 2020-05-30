@@ -14,8 +14,6 @@ from dense_correspondence.training.training import DenseCorrespondenceTraining
 from dense_correspondence.dataset.spartan_dataset_masked import SpartanDataset
 logging.basicConfig(level=logging.INFO)
 
-from dense_correspondence.evaluation.evaluation import DenseCorrespondenceEvaluation
-
 if len(sys.argv) != 3:
     print("{} requires two arguments: path to training config and path to dataset config.".format(
         sys.argv[0]))
@@ -34,7 +32,6 @@ else:
 time_string = strftime('%d-%m-%Y_%H-%M-%S')  # %X=clock time (%H:%M:%S), %d day, %m month, %Y year
 train_config['training']['logging_dir_name'] = '{0}_{1}'.format(
     train_config['logging']['experiment'].replace(' ', '_'), time_string)
-train_config['logging']['tags'].append(train_config['training']['logging_dir_name'])
 
 train = DenseCorrespondenceTraining(dataset=dataset, config=train_config)
 train.run()

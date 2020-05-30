@@ -20,6 +20,8 @@ import tensorboard_logger
 
 # dense correspondence
 import dense_correspondence_manipulation.utils.utils as utils
+from dense_correspondence.loss_functions.repeatability_loss import RepeatabilityLoss
+
 utils.add_dense_correspondence_to_python_path()
 import pytorch_segmentation_detection.models.fcn as fcns
 import pytorch_segmentation_detection.models.resnet_dilated as resnet_dilated
@@ -359,11 +361,13 @@ class DenseCorrespondenceTraining(object):
                 self.logger.log('learning rate', x=iteration, y=self.get_learning_rate(optimizer))
 
                 # run both images through the network
-                image_a_pred_, reliability_a_ = dcn.forward(img_a)
-                image_a_pred, reliability_a = dcn.process_network_output(image_a_pred_, reliability_a_, batch_size)
+                output_a = dcn.forward(img_a)
+                output_a = dcn.process_network_output(output_a, batch_size)
+                image_a_pred, reliability_a, repeatability_a = output_a
 
-                image_b_pred_, reliability_b_ = dcn.forward(img_b)
-                image_b_pred, reliability_b = dcn.process_network_output(image_b_pred_, reliability_b_, batch_size)
+                output_b = dcn.forward(img_b)
+                output_b = dcn.process_network_output(output_b, batch_size)
+                image_b_pred, reliability_b, repeatability_b = output_b
 
                 # get loss
                 loss, match_loss, masked_non_match_loss, background_non_match_loss, blind_non_match_loss = 0, 0, 0, 0, 0
@@ -412,6 +416,21 @@ class DenseCorrespondenceTraining(object):
                     self.logger.log('loss', x=iteration, y=loss.item())
                 else:
                     raise NotImplementedError('loss function')
+
+                # Add loss from repeatability
+                if self._config['dense_correspondence_network']['head']['class'] and \
+                        self._config['dense_correspondence_network']['head']['repeatability']:
+                    repeatability_loss, cosine_loss, peaky_loss = RepeatabilityLoss.get_loss(
+                        repeatability_a, repeatability_b, dataset_item
+                    )
+                    self.logger.log('repeatability_loss', x=iteration, y=repeatability_loss.item())
+                    self.logger.log('cosine_loss', x=iteration, y=cosine_loss.item())
+                    self.logger.log('peaky_loss', x=iteration, y=peaky_loss.item())
+                    print(loss.shape)
+                    print(loss)
+                    print(repeatability_loss.shape)
+                    print(repeatability_loss)
+                    loss += repeatability_loss
 
                 loss.backward()
                 optimizer.step()

@@ -1,14 +1,11 @@
-#!/usr/bin/python
-
 import sys, os
 import numpy as np
 import warnings
 import logging
+from collections import namedtuple
 import dense_correspondence_manipulation.utils.utils as utils
 
 utils.add_dense_correspondence_to_python_path()
-
-from PIL import Image
 
 import torch
 import torch.nn as nn
@@ -16,6 +13,9 @@ import torch.nn.functional as F
 from torchvision import transforms
 import pytorch_segmentation_detection.models.resnet_dilated as resnet_dilated
 from dense_correspondence.dataset.spartan_dataset_masked import SpartanDataset
+
+
+NetworkOutput = namedtuple('NetworkOutput', ['descriptors', 'reliability', 'repeatability'])
 
 
 class DenseCorrespondenceNetwork(nn.Module):
@@ -242,12 +242,8 @@ class DenseCorrespondenceNetwork(nn.Module):
         :rtype:
         """
 
-        if hasattr(self.fcn, 'num_outputs') and self.fcn.num_outputs == 2:
-            descriptors, reliability = self.fcn(img_tensor)
-        else:
-            descriptors = self.fcn(img_tensor)
-            reliability = None
-
+        output = self.fcn(img_tensor)
+        descriptors = output.descriptors
         if self._normalize == 'unit_ball':
             norm = torch.norm(descriptors, 2, 1) # [N,1,H,W]
             longest_descriptor = torch.max(norm)
@@ -255,7 +251,7 @@ class DenseCorrespondenceNetwork(nn.Module):
         elif self._normalize == 'unit_sphere':
             descriptors = F.normalize(descriptors, p=2, dim=1)
 
-        return descriptors, reliability
+        return NetworkOutput(descriptors, output.reliability, output.reliability)
 
     def forward_single_image_tensor(self, img_tensor):
         """
@@ -279,38 +275,44 @@ class DenseCorrespondenceNetwork(nn.Module):
         # make sure it's on the GPU
         img_tensor = torch.tensor(img_tensor, device=torch.device("cuda"))
 
-        res, reliability_map = self.forward(img_tensor)  # shape [1,D,H,W]
-        # print "res.shape 1", res.shape
+        res, reliability, repeatability = self.forward(img_tensor)  # shape [1,D,H,W]
 
         res = res.squeeze(0)  # shape [D,H,W]
-        if reliability_map is not None:
-            reliability_map = reliability_map.squeeze(0)
-        # print "res.shape 2", res.shape
+        if reliability is not None:
+            reliability = reliability.squeeze(0)
+        if repeatability is not None:
+            repeatability = repeatability.squeeze(0)
 
         res = res.permute(1, 2, 0)  # shape [H,W,D]
-        # print "res.shape 3", res.shape
 
-        return res, reliability_map
+        return NetworkOutput(res, reliability, repeatability)
 
-    def process_network_output(self, image_pred, reliability_map, N):
+    def process_network_output(self, output, N):
         """
         Processes the network output into a new shape
 
-        :param image_pred: output of the network img.shape = [N,descriptor_dim, H , W]
-        :type image_pred: torch.Tensor
+        :param output: network output with descriptors, reliability, repeatability
+        :type output: NetworkOutput
         :param N: batch size
         :type N: int
         :return: same as input, new shape is [N, W*H, descriptor_dim]
         :rtype:
+
+        output.descriptors: output of the network img.shape = [N,descriptor_dim, H , W]
+        output.descriptors: torch.Tensor
         """
 
         W = self._image_width
         H = self._image_height
-        image_pred = image_pred.view(N, self.descriptor_dimension, W * H)
+        image_pred = output.descriptors.view(N, self.descriptor_dimension, W * H)
         image_pred = image_pred.permute(0, 2, 1)
-        if reliability_map is not None:
-            reliability_map = reliability_map.view(N, W * H)
-        return image_pred, reliability_map
+        reliability = output.reliability
+        repeatability = output.repeatability
+        if reliability is not None:
+            reliability = reliability.view(N, W * H)
+        if repeatability is not None:
+            repeatability = repeatability.view(N, W * H)
+        return NetworkOutput(image_pred, reliability, repeatability)
 
     def clip_pixel_to_image_size_and_round(self, uv):
         """
@@ -367,8 +369,10 @@ class DenseCorrespondenceNetwork(nn.Module):
             if config["backbone"]["model_class"] == "Resnet":
                 resnet_model = config["backbone"]["resnet_name"]
                 fcn = getattr(resnet_dilated, resnet_model)(num_classes=config['descriptor_dimension'])
+                fcn = NetworkWrapper(fcn)
             elif config["backbone"]["model_class"] == "Unet":
                 fcn = DenseCorrespondenceNetwork.get_unet(config)
+                fcn = NetworkWrapper(fcn)
             else:
                 raise ValueError("Can't build backbone network.  I don't know this backbone model class!")
         elif config['head']['class'] == 'ReliabilitySoftplus':
@@ -376,7 +380,11 @@ class DenseCorrespondenceNetwork(nn.Module):
                                       config['descriptor_dimension'],
                                       config['head']["add_conv"])
         elif config['head']['class'] == 'R2D2Net':
-            fcn = R2D2Net(config["backbone"]["resnet_name"], config['descriptor_dimension'])
+            fcn = R2D2Net(
+                config["backbone"]["resnet_name"],
+                config['descriptor_dimension'],
+                config['head']['reliability'],
+                config['head']['repeatability'])
 
         return fcn
 
@@ -569,7 +577,24 @@ class DenseCorrespondenceNetwork(nn.Module):
         return des
 
 
+class NetworkWrapper(nn.Module):
+    """
+    Wraps the descriptors output from the fully-convolutional network backbone into a NetworkOutput.
+    """
+    def __init__(self, fcn):
+        super(NetworkWrapper, self).__init__()
+        self.fcn = fcn
+
+    def forward(self, *input):
+        descriptors = self.fcn(*input)
+        return NetworkOutput(descriptors, None, None)
+
+
 class ReliabilitySoftplus(nn.Module):
+    """
+    Network based on the paper
+    Self-supervised Learning of Geometrically Stable Features Through Probabilistic Introspection.
+    """
     def __init__(self, resnet_model, descriptor_dimension, add_conv=False):
         super(ReliabilitySoftplus, self).__init__()
         if add_conv:
@@ -591,18 +616,34 @@ class ReliabilitySoftplus(nn.Module):
             descriptors_output, reliability_output = torch.split(
                 x, split_size_or_sections=self._descriptor_dimension, dim=1)
         reliability_output = F.softplus(reliability_output).clamp(min=1e-2)
-        return descriptors_output, reliability_output
+        return NetworkOutput(descriptors_output, reliability_output, None)
 
 
 class R2D2Net(nn.Module):
-    def __init__(self, resnet_model, descriptor_dimension):
+    """Network based on the paper R2D2: Repeatable and Reliable Detector and Descriptor."""
+    def __init__(self, resnet_model, descriptor_dimension, reliability, repeatability):
         super(R2D2Net, self).__init__()
         self.resnet = getattr(resnet_dilated, resnet_model)(descriptor_dimension)
-        self.reliability_layer = nn.Conv2d(in_channels=descriptor_dimension, out_channels=2, kernel_size=1)
-        self.num_outputs = 2
+        self.reliability_layer = None
+        self.repeatability_layer = None
+        self.num_outputs = 1
+        if reliability:
+            self.reliability_layer = nn.Conv2d(
+                in_channels=descriptor_dimension, out_channels=2, kernel_size=1)
+            self.num_outputs += 1
+        if repeatability:
+            self.repeatability_layer = nn.Conv2d(
+                in_channels=descriptor_dimension, out_channels=2, kernel_size=1)
+            self.num_outputs += 1
 
     def forward(self, x):
-        descriptors_output = self.resnet.forward(x)
-        reliability_output = self.reliability_layer(descriptors_output ** 2)
-        reliability_output = F.softmax(reliability_output, dim=1)[:, 1:2]
-        return descriptors_output, reliability_output
+        descriptors = self.resnet.forward(x)
+        reliability = None
+        repeatability = None
+        if self.reliability_layer:
+            reliability = self.reliability_layer(descriptors ** 2)
+            reliability = F.softmax(reliability, dim=1)[:, 1:2]
+        if self.repeatability_layer:
+            repeatability = self.repeatability_layer(descriptors ** 2)
+            repeatability = F.softmax(repeatability, dim=1)[:, 1:2]
+        return NetworkOutput(descriptors, reliability, repeatability)

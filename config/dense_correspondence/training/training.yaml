@@ -47,6 +47,8 @@ dense_correspondence_network:
     # currently no options supported
   head:
     class: 'R2D2Net'  # options: {null, R2D2Net, ReliabilitySoftplus}
+    reliability: true  # {false, true}
+    repeatability: true  # {false, true}
     add_conv: True    # This is an additional option for ReliabilitySoftplus net
 
 loss_function:
@@ -79,6 +81,7 @@ logging:
   description: 'This is example description'
   qualitative_evaluation_logging_rate: 500
   initial_qualitative_evaluation_logging_rate: 100
+  quantitative_evaluation_logging_rate: 500
   tags: # list as many tags you want. They intend to help you search/filter experiemnts
     - 'unknown_user'
   upload_source_files:
