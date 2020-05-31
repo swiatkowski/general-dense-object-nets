@@ -5,7 +5,7 @@
 #SBATCH --qos=8gpu3d
 #SBATCH --gres=gpu:0
 #SBATCH --nodelist=asusgpu4
-#SBATCH --output=/results/jkopanski/data-download-log-5.txt
+#SBATCH --output=/results/data-download-log.txt
 
 code_dir="/results/$USER/general-dense-object-nets"
 config_files="/$code_dir/config/dense_correspondence/dataset/composite/*"
