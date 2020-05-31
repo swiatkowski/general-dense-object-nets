@@ -44,7 +44,7 @@ from dense_correspondence.evaluation.evaluation import DenseCorrespondenceEvalua
 from dense_correspondence.evaluation.evaluation import DenseCorrespondenceEvaluationPlotter as DCEP
 from dense_correspondence.evaluation.plotting import normalize_descriptor
 from dense_correspondence.logging.dispatcher import dispatch_logger
-from dense_correspondence.logging.reliability_statistics import ReliabilityStatistics
+from dense_correspondence.logging.statistics import HeatmapStatistics
 
 from dense_correspondence.loss_functions.probabilistic_loss import ProbabilisticLoss
 
@@ -498,32 +498,52 @@ class DenseCorrespondenceTraining(object):
                 update_plots(loss, match_loss, masked_non_match_loss, background_non_match_loss, blind_non_match_loss)
 
                 if reliability_a is not None and reliability_b is not None:
-                    reliability_stats = ReliabilityStatistics(
+                    reliability_stats = HeatmapStatistics(
                         'reliability_train_matches',
                         create_histogram=self.is_qualitative_evaluation_iteration(iteration))
                     reliability_stats.add_from_matches(reliability_a, matches_a)
                     reliability_stats.add_from_matches(reliability_b, matches_b)
                     reliability_stats.log(self.logger, iteration)
 
+                if repeatability_a is not None and repeatability_b is not None:
+                    repeatability_stats = HeatmapStatistics(
+                        'repeatability_train_matches',
+                        create_histogram=self.is_qualitative_evaluation_iteration(iteration))
+                    repeatability_stats.add_from_matches(repeatability_a, matches_a)
+                    repeatability_stats.add_from_matches(repeatability_b, matches_b)
+                    repeatability_stats.log(self.logger, iteration)
+
                 if loss_current_iteration % save_rate == 0:
                     print("Saving model at iter: ", loss_current_iteration)
                     self.save_network(dcn, optimizer, loss_current_iteration, logging_dict=self._logging_dict, last_only=True)
 
                 if self.is_qualitative_evaluation_iteration(iteration):
-                    reliability_stats = ReliabilityStatistics('reliability_eval_mask',
+                    reliability_stats = None
+                    repeatability_stats = None
+                    if reliability_a is not None and reliability_b is not None:
+                        reliability_stats = HeatmapStatistics('reliability_eval_mask',
                                                               create_histogram=True)
+                    if repeatability_a is not None and repeatability_b is not None:
+                        repeatability_stats = HeatmapStatistics('repeatability_eval_mask',
+                                                              create_histogram=True)
+
                     normalization = self._config['dense_correspondence_network']['normalize']
                     output_is_normalized = normalization is not None
                     evaluations = DCE.evaluate_network_qualitative_without_plotting(
                         dcn, dataset=self.dataset, randomize=True,
                         output_is_normalized=output_is_normalized,
-                        reliability_stats=reliability_stats)
+                        reliability_stats=reliability_stats,
+                        repeatability_stats=repeatability_stats
+                    )
                     for e, _ in evaluations['train_evals']:
                         self.logger.log('Train eval - iter {}'.format(iteration), e * 255.0, type='image')
                     for e, _ in evaluations['test_evals']:
                         self.logger.log('Test eval - iter {}'.format(iteration), e * 255.0, type='image')
-                    if reliability_a is not None and reliability_b is not None:
+
+                    if reliability_stats:
                         reliability_stats.log(self.logger, iteration)
+                    if repeatability_stats:
+                        repeatability_stats.log(self.logger, iteration)
 
                 if (iteration + 1) % self._config["logging"]["quantitative_evaluation_logging_rate"] == 0:
                     self.evaluate_quantitative(iteration=iteration, dcn=dcn)
