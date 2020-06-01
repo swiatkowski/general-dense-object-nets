@@ -22,6 +22,8 @@ train_config_file = os.path.join(utils.getDenseCorrespondenceSourceDir(), sys.ar
 data_config_file = os.path.join(utils.getDenseCorrespondenceSourceDir(), sys.argv[2])
 
 train_config = utils.getDictFromYamlFilename(train_config_file)
+print('train_config loaded')
+
 data_config = utils.getDictFromYamlFilename(data_config_file)
 if '/expanded/' in data_config_file:
     dataset = SpartanDataset(config_expanded=data_config)
