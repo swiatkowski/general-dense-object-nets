@@ -678,9 +678,14 @@ class DenseCorrespondenceEvaluation(object):
         rgb_a_tensor = dataset.rgb_image_to_tensor(rgb_a)
         rgb_b_tensor = dataset.rgb_image_to_tensor(rgb_b)
 
+        # in the future it will be handled by segmentation head
+        if dcn._config['mask_only']:
+            rgb_a_tensor *= torch.FloatTensor(mask_a[None, :, :])
+            rgb_b_tensor *= torch.FloatTensor(mask_b[None, :, :])
+
         # these are Variables holding torch.FloatTensors, first grab the data, then convert to numpy
-        res_a, reliability_a, repeatability_a = dcn.forward_single_image_tensor(rgb_a_tensor)
-        res_b, reliability_b, repeatability_b = dcn.forward_single_image_tensor(rgb_b_tensor)
+        res_a, _ = dcn.forward_single_image_tensor(rgb_a_tensor)
+        res_b, _ = dcn.forward_single_image_tensor(rgb_b_tensor)
         res_a = res_a.data.cpu().numpy()
         res_b = res_b.data.cpu().numpy()
 
@@ -953,9 +958,14 @@ class DenseCorrespondenceEvaluation(object):
         rgb_a_tensor = dataset.rgb_image_to_tensor(rgb_a)
         rgb_b_tensor = dataset.rgb_image_to_tensor(rgb_b)
 
+        # in the future it will be handled by segmentation head
+        if dcn._config['mask_only']:
+            rgb_a_tensor *= torch.FloatTensor(mask_a[None, :, :])
+            rgb_b_tensor *= torch.FloatTensor(mask_b[None, :, :])
+
         # these are Variables holding torch.FloatTensors, first grab the data, then convert to numpy
-        res_a, reliability_a, repeatability_a = dcn.forward_single_image_tensor(rgb_a_tensor)
-        res_b, reliability_b, repeatability_b = dcn.forward_single_image_tensor(rgb_b_tensor)
+        res_a, _ = dcn.forward_single_image_tensor(rgb_a_tensor)
+        res_b, _ = dcn.forward_single_image_tensor(rgb_b_tensor)
         res_a = res_a.data.cpu().numpy()
         res_b = res_b.data.cpu().numpy()
 
@@ -1432,6 +1442,11 @@ class DenseCorrespondenceEvaluation(object):
         # compute dense descriptors
         rgb_a_tensor = dataset.rgb_image_to_tensor(rgb_a)
         rgb_b_tensor = dataset.rgb_image_to_tensor(rgb_b)
+
+        # in the future it will be handled by segmentation head
+        if dcn._config['mask_only']:
+            rgb_a_tensor *= torch.FloatTensor(mask_a[None, :, :])
+            rgb_b_tensor *= torch.FloatTensor(mask_b[None, :, :])
 
         # these are Variables holding torch.FloatTensors, first grab the data, then convert to numpy
         res_a, reliability_a, repeatability_a = dcn.forward_single_image_tensor(rgb_a_tensor)

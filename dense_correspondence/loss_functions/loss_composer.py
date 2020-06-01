@@ -78,32 +78,44 @@ def get_within_scene_loss(pixelwise_contrastive_loss, image_a_pred, image_b_pred
     pcl = pixelwise_contrastive_loss
 
     match_loss, masked_non_match_loss, num_masked_hard_negatives =\
-        pixelwise_contrastive_loss.get_loss_matched_and_non_matched_with_l2(image_a_pred,         image_b_pred,
-                                                                          matches_a,            matches_b,
-                                                                          masked_non_matches_a, masked_non_matches_b,
-                                                                          M_descriptor=pcl._config["M_masked"])
+        pcl.get_loss_matched_and_non_matched_with_l2(
+            image_a_pred, image_b_pred,
+            matches_a, matches_b,
+            masked_non_matches_a, masked_non_matches_b,
+            M_descriptor=pcl._config["M_masked"]
+        )
 
-    if pcl._config["use_l2_pixel_loss_on_background_non_matches"]:
-        background_non_match_loss, num_background_hard_negatives =\
-            pixelwise_contrastive_loss.non_match_loss_with_l2_pixel_norm(image_a_pred, image_b_pred, matches_b,
-                background_non_matches_a, background_non_matches_b, M_descriptor=pcl._config["M_background"])
+    background_non_match_loss = zero_loss()
+    num_background_hard_negatives = 1
+    if background_non_matches_a is not None and background_non_matches_b is not None:
+        if pcl._config["use_l2_pixel_loss_on_background_non_matches"]:
+            background_non_match_loss, num_background_hard_negatives =\
+                pcl.non_match_loss_with_l2_pixel_norm(
+                    image_a_pred, image_b_pred, matches_b,
+                    background_non_matches_a, background_non_matches_b,
+                    M_descriptor=pcl._config["M_background"]
+                )
 
-    else:
-        background_non_match_loss, num_background_hard_negatives =\
-            pixelwise_contrastive_loss.non_match_loss_descriptor_only(image_a_pred, image_b_pred,
-                                                                    background_non_matches_a, background_non_matches_b,
-                                                                    M_descriptor=pcl._config["M_background"])
+        else:
+            background_non_match_loss, num_background_hard_negatives =\
+                pcl.non_match_loss_descriptor_only(
+                    image_a_pred, image_b_pred,
+                    background_non_matches_a, background_non_matches_b,
+                    M_descriptor=pcl._config["M_background"]
+                )
 
 
 
     blind_non_match_loss = zero_loss()
     num_blind_hard_negatives = 1
-    if not (SpartanDataset.is_empty(blind_non_matches_a.data)):
+    if blind_non_matches_a is not None and blind_non_matches_b is not None\
+        and not (SpartanDataset.is_empty(blind_non_matches_a.data)):
         blind_non_match_loss, num_blind_hard_negatives =\
-            pixelwise_contrastive_loss.non_match_loss_descriptor_only(image_a_pred, image_b_pred,
-                                                                    blind_non_matches_a, blind_non_matches_b,
-                                                                    M_descriptor=pcl._config["M_masked"])
-
+            pcl.non_match_loss_descriptor_only(
+                image_a_pred, image_b_pred,
+                blind_non_matches_a, blind_non_matches_b,
+                M_descriptor=pcl._config["M_masked"]
+            )
 
 
     total_num_hard_negatives = num_masked_hard_negatives + num_background_hard_negatives

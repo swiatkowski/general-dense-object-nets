@@ -314,7 +314,7 @@ class DenseCorrespondenceTraining(object):
 
         total_time = time.time()
         iteration=0
-        for epoch in range(50):  # loop over the dataset multiple times
+        for epoch in range(5000):  # loop over the dataset multiple times
             for i, data in enumerate(self._data_loader, 0):
                 iteration += 1
                 loss_current_iteration += 1
@@ -345,11 +345,24 @@ class DenseCorrespondenceTraining(object):
                 masked_non_matches_a = Variable(masked_non_matches_a.cuda().squeeze(0), requires_grad=False)
                 masked_non_matches_b = Variable(masked_non_matches_b.cuda().squeeze(0), requires_grad=False)
 
-                background_non_matches_a = Variable(background_non_matches_a.cuda().squeeze(0), requires_grad=False)
-                background_non_matches_b = Variable(background_non_matches_b.cuda().squeeze(0), requires_grad=False)
+                if self._config['dense_correspondence_network']['mask_only']:
+                    # _, _, mask_a, _ = self.dataset.get_rgbd_mask_pose(metadata['scene_name'][0], metadata['image_a_idx'].item())
+                    # _, _, mask_b, _ = self.dataset.get_rgbd_mask_pose(metadata['scene_name'][0], metadata['image_b_idx'].item())
+                    # mask_a = torch.from_numpy(np.asarray(mask_a,dtype=np.float32)).cuda()
+                    # mask_b = torch.from_numpy(np.asarray(mask_b,dtype=np.float32)).cuda()
+                    # img_a *= mask_a[None, None, :, :]
+                    # img_b *= mask_b[None, None, :, :]
 
-                blind_non_matches_a = Variable(blind_non_matches_a.cuda().squeeze(0), requires_grad=False)
-                blind_non_matches_b = Variable(blind_non_matches_b.cuda().squeeze(0), requires_grad=False)
+                    background_non_matches_a = None
+                    background_non_matches_b = None
+                    blind_non_matches_a = None
+                    blind_non_matches_b = None
+                else:
+                    background_non_matches_a = Variable(background_non_matches_a.cuda().squeeze(0), requires_grad=False)
+                    background_non_matches_b = Variable(background_non_matches_b.cuda().squeeze(0), requires_grad=False)
+
+                    blind_non_matches_a = Variable(blind_non_matches_a.cuda().squeeze(0), requires_grad=False)
+                    blind_non_matches_b = Variable(blind_non_matches_b.cuda().squeeze(0), requires_grad=False)
 
                 dataset_item = DatasetItem(
                     match_type, img_a, img_b, matches_a, matches_b, masked_non_matches_a, masked_non_matches_b,
@@ -546,6 +559,9 @@ class DenseCorrespondenceTraining(object):
                         repeatability_stats.log(self.logger, iteration)
 
                 if (iteration + 1) % self._config["logging"]["quantitative_evaluation_logging_rate"] == 0:
+                    print '=' * 80
+                    print 'eval quant'
+                    print '=' * 80
                     self.evaluate_quantitative(iteration=iteration, dcn=dcn)
 
                 # don't compute the test loss on the first few times through the loop

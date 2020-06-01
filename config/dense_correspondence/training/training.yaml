@@ -35,6 +35,7 @@ training:
   seed: null  # seed to pytorch and numpy (null for random seed or int for deterministic)
 
 dense_correspondence_network:
+  mask_only: False # Train on masks only. Ignore background
   descriptor_dimension: 3
   extra_dimensions: [256, 128] # number of conv kernels to add between end of backbone and descriptors. Optional
   image_width: 640
@@ -67,7 +68,6 @@ loss_function:
   alpha_triplet: 0.1
   inner_radius: 20
   outter_radius: 30
-  num_negative_samples: 150  # Deprecated
   nq: 25
   num_samples: 150
   sampler:

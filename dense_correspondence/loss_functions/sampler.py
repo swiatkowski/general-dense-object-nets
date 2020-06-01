@@ -104,16 +104,20 @@ class DONSampler(Sampler):
 
         masked = self.reshape_don_non_matches(dataset_item.masked_non_matches_b)
         masked_num_samples = int(num_samples * self.mask_weight / (self.mask_weight + self.background_weight))
+        assert masked_num_samples > 0
+
         random_indices = torch.randint(0, masked.shape[1], (masked_num_samples,))
         masked_points = masked[:, random_indices]
 
+        if self.background_weight == 0:
+            return masked_points
+
         background = self.reshape_don_non_matches(dataset_item.background_non_matches_b)
         background_num_samples = num_samples - masked_num_samples
+        assert background_num_samples > 0
+        assert num_samples == masked_num_samples + background_num_samples
+
         random_indices = torch.randint(0, background.shape[1], (background_num_samples,))
         background_points = background[:, random_indices]
-
-        assert num_samples == masked_num_samples + background_num_samples
-        assert masked_num_samples > 0
-        assert background_num_samples > 0
 
         return torch.cat([masked_points, background_points], dim=-1)
