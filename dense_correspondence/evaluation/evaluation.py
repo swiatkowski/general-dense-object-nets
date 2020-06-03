@@ -41,10 +41,13 @@ DescriptorColormaps = namedtuple('DescriptorColormaps', [
     'masked_normalized_descriptor1',
     'masked_normalized_descriptor2'
 ])
-ImagePairQualitativeResult = namedtuple('ImagePairQualitativeResult', ['correspondence', 'descriptor_colormaps',
-                                                                       'reliability_maps'])
-
-ReliabilityMap = namedtuple('ReliabilityMap', ['reliability1', 'reliability2'])
+ImagePairQualitativeResult = namedtuple('ImagePairQualitativeResult', [
+    'correspondence',
+    'descriptor_colormaps',
+    'reliability_maps',
+    'repeatability_maps'
+])
+Heatmaps = namedtuple('Heatmaps', ['map1', 'map2'])
 
 
 # why don't we have scene_name
@@ -543,47 +546,50 @@ class DenseCorrespondenceEvaluation(object):
         return pd_dataframe_list, df
 
     @staticmethod
-    def plot_reliability_maps(reliability_a, reliability_b, use_colormap=True):
-        assert reliability_a is not None
-        assert reliability_b is not None
-        assert reliability_a.shape[0] == 1, 'assume that batch size is 1 for evaluation'
-        assert reliability_b.shape[0] == 1, 'assume that batch size is 1 for evaluation'
-        reliability_a = np.squeeze(reliability_a, axis=0)
-        reliability_b = np.squeeze(reliability_b, axis=0)
+    def plot_heatmaps(heatmap_a, heatmap_b, colormap=cv2.COLORMAP_JET):
+        """
+        :param colormap: one of cv2 colormaps or negative value for grayscale.
+        """
+        assert heatmap_a is not None
+        assert heatmap_b is not None
+        assert heatmap_a.shape[0] == 1, 'assume that batch size is 1 for evaluation'
+        assert heatmap_b.shape[0] == 1, 'assume that batch size is 1 for evaluation'
+        heatmap_a = np.squeeze(heatmap_a, axis=0)
+        heatmap_b = np.squeeze(heatmap_b, axis=0)
 
-        # Normalization of reliability maps to [0, 1].
-        # Normalize only if values in reliability maps are not in [0, 1].
-        reliability_a_min = reliability_a.min()
-        reliability_b_min = reliability_b.min()
-        reliability_a_max = reliability_a.max()
-        reliability_b_max = reliability_b.max()
-        both_reliability_maps_min = min(reliability_a_min, reliability_b_min)
-        both_reliability_maps_max = max(reliability_a_max, reliability_b_max)
-        if not (0 <= both_reliability_maps_min and both_reliability_maps_max <= 1):
-            stats = {'min': both_reliability_maps_min, 'max': both_reliability_maps_max}
-            reliability_a = dc_plotting.normalize_descriptor(reliability_a, stats)
-            reliability_b = dc_plotting.normalize_descriptor(reliability_b, stats)
+        # Normalization of heatmap maps to [0, 1].
+        # Normalize only if values in heatmap maps are not in [0, 1].
+        heatmap_a_min = heatmap_a.min()
+        heatmap_b_min = heatmap_b.min()
+        heatmap_a_max = heatmap_a.max()
+        heatmap_b_max = heatmap_b.max()
+        both_heatmap_maps_min = min(heatmap_a_min, heatmap_b_min)
+        both_heatmap_maps_max = max(heatmap_a_max, heatmap_b_max)
+        if not (0 <= both_heatmap_maps_min and both_heatmap_maps_max <= 1):
+            stats = {'min': both_heatmap_maps_min, 'max': both_heatmap_maps_max}
+            heatmap_a = dc_plotting.normalize_descriptor(heatmap_a, stats)
+            heatmap_b = dc_plotting.normalize_descriptor(heatmap_b, stats)
 
-        if use_colormap:
-            def apply_colormap(reliability):
+        if colormap >= 0:
+            def apply_colormap(heatmap):
                 # Scale values from [0, 1] to [0, 255] to apply colormap
-                reliability = (reliability * 255).astype(np.uint8)
+                heatmap = (heatmap * 255).astype(np.uint8)
                 # Convert to heatmap
-                reliability = cv2.applyColorMap(reliability, cv2.COLORMAP_JET)
+                heatmap = cv2.applyColorMap(heatmap, colormap)
                 # Convert from BGR used by OpenCV to RGB
-                reliability = cv2.cvtColor(reliability, cv2.COLOR_BGR2RGB)
+                heatmap = cv2.cvtColor(heatmap, cv2.COLOR_BGR2RGB)
                 # Scale back to [0, 1]
-                reliability = reliability.astype(float) / 255
-                return reliability
+                heatmap = heatmap.astype(float) / 255
+                return heatmap
 
-            reliability_a = apply_colormap(reliability_a)
-            reliability_b = apply_colormap(reliability_b)
+            heatmap_a = apply_colormap(heatmap_a)
+            heatmap_b = apply_colormap(heatmap_b)
 
         else:  # use grayscale
-            reliability_a = np.repeat(reliability_a[:, :, np.newaxis], 3, axis=2)
-            reliability_b = np.repeat(reliability_b[:, :, np.newaxis], 3, axis=2)
+            heatmap_a = np.repeat(heatmap_a[:, :, np.newaxis], 3, axis=2)
+            heatmap_b = np.repeat(heatmap_b[:, :, np.newaxis], 3, axis=2)
 
-        return reliability_a, reliability_b
+        return heatmap_a, heatmap_b
 
     @staticmethod
     def plot_descriptor_colormaps(res_a, res_b, descriptor_image_stats=None,
@@ -1483,26 +1489,30 @@ class DenseCorrespondenceEvaluation(object):
                                                                                         plot_masked=True,
                                                                                         output_is_normalized=output_is_normalized)
 
+        reliability_maps = None
         if reliability_a is not None and reliability_b is not None:
             reliability_a = reliability_a.data.cpu().numpy()
             reliability_b = reliability_b.data.cpu().numpy()
             if reliability_stats:
                 reliability_stats.add_from_mask(reliability_a, mask_a)
                 reliability_stats.add_from_mask(reliability_b, mask_b)
-            reliability_a, reliability_b = DenseCorrespondenceEvaluation.plot_reliability_maps(
+            reliability_a, reliability_b = DenseCorrespondenceEvaluation.plot_heatmaps(
                 reliability_a, reliability_b)
-            reliability_maps = ReliabilityMap(reliability_a, reliability_b)
-        else:
-            reliability_maps = None
+            reliability_maps = Heatmaps(reliability_a, reliability_b)
 
+        repeatability_maps = None
         if repeatability_a is not None and repeatability_b is not None:
             repeatability_a = repeatability_a.data.cpu().numpy()
             repeatability_b = repeatability_b.data.cpu().numpy()
             if repeatability_stats:
                 repeatability_stats.add_from_mask(repeatability_a, mask_a)
                 repeatability_stats.add_from_mask(repeatability_b, mask_b)
+            repeatability_a, repeatability_b = DenseCorrespondenceEvaluation.plot_heatmaps(
+                repeatability_a, repeatability_b)
+            repeatability_maps = Heatmaps(repeatability_a, repeatability_b)
 
-        return ImagePairQualitativeResult(correspondence_image_pair, decriptors_images, reliability_maps)
+        return ImagePairQualitativeResult(
+            correspondence_image_pair, decriptors_images, reliability_maps, repeatability_maps)
 
     @staticmethod
     def single_image_pair_cross_scene_keypoints_quantitative_analysis(dcn, dataset, keypoint_data_a,
@@ -2169,7 +2179,9 @@ class DenseCorrespondenceEvaluation(object):
                                                                                                       scene_name,
                                                                                                       img_pair[0],
                                                                                                       img_pair[1],
-                                                                                                      output_is_normalized=output_is_normalized)
+                                                                                                      output_is_normalized=output_is_normalized,
+                                                                                                      reliability_stats=reliability_stats,
+                                                                                                      repeatability_stats=repeatability_stats)
                 test_results.append((res, comment))
 
             caterpillar_test_evals = DenseCorrespondenceEvaluation.combine_qualitative_evaluations(
@@ -2212,10 +2224,16 @@ class DenseCorrespondenceEvaluation(object):
                 output_image = np.concatenate((output_image, combined_masked_descriptors), axis=0)
 
         if data.reliability_maps is not None:
-            rel1 = data.reliability_maps.reliability1
-            rel2 = data.reliability_maps.reliability2
+            rel1 = data.reliability_maps.map1
+            rel2 = data.reliability_maps.map2
             combined_reliability_maps = np.concatenate((rel1, rel2), axis=1)
             output_image = np.concatenate((output_image, combined_reliability_maps), axis=0)
+
+        if data.repeatability_maps is not None:
+            rep1 = data.repeatability_maps.map1
+            rep2 = data.repeatability_maps.map2
+            combined_repeatability_maps = np.concatenate((rep1, rep2), axis=1)
+            output_image = np.concatenate((output_image, combined_repeatability_maps), axis=0)
 
         return output_image, comment
 
