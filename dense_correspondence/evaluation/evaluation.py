@@ -456,7 +456,7 @@ class DenseCorrespondenceEvaluation(object):
                 continue
             rgb, _, _, _ = dataset.get_rgbd_mask_pose(scene_name, image_idx)
             rgb_tensor = dataset.rgb_image_to_tensor(rgb)
-            res, reliability = dcn.forward_single_image_tensor(rgb_tensor)
+            res, reliability, repeatability = dcn.forward_single_image_tensor(rgb_tensor)
             res = res.data.cpu().numpy()
             descriptor_images[scene_name][image_idx] = res
 
@@ -673,8 +673,8 @@ class DenseCorrespondenceEvaluation(object):
         rgb_b_tensor = dataset.rgb_image_to_tensor(rgb_b)
 
         # these are Variables holding torch.FloatTensors, first grab the data, then convert to numpy
-        res_a, reliability_a = dcn.forward_single_image_tensor(rgb_a_tensor)
-        res_b, reliability_b = dcn.forward_single_image_tensor(rgb_b_tensor)
+        res_a, reliability_a, repeatability_a = dcn.forward_single_image_tensor(rgb_a_tensor)
+        res_b, reliability_b, repeatability_b = dcn.forward_single_image_tensor(rgb_b_tensor)
         res_a = res_a.data.cpu().numpy()
         res_b = res_b.data.cpu().numpy()
 
@@ -763,7 +763,7 @@ class DenseCorrespondenceEvaluation(object):
                     continue
 
                 diff_rgb_a_tensor = dataset.rgb_image_to_tensor(diff_rgb_a)
-                diff_res_a, reliability_a = dcn.forward_single_image_tensor(diff_rgb_a_tensor)
+                diff_res_a, reliability_a, repeatability_a = dcn.forward_single_image_tensor(diff_rgb_a_tensor)
                 diff_res_a = diff_res_a.data.cpu().numpy()
 
                 diff_uv_a = (diff_uv_a_vec[0][0], diff_uv_a_vec[1][0])
@@ -806,7 +806,7 @@ class DenseCorrespondenceEvaluation(object):
                     continue
 
                 diff_rgb_b_tensor = dataset.rgb_image_to_tensor(diff_rgb_b)
-                diff_res_b, reliability_b = dcn.forward_single_image_tensor(diff_rgb_b_tensor)
+                diff_res_b, reliability_b, repeatability_b = dcn.forward_single_image_tensor(diff_rgb_b_tensor)
                 diff_res_b = diff_res_b.data.cpu().numpy()
 
                 diff_uv_b = (diff_uv_b_vec[0][0], diff_uv_b_vec[1][0])
@@ -867,8 +867,8 @@ class DenseCorrespondenceEvaluation(object):
         rgb_b_tensor = dataset.rgb_image_to_tensor(rgb_b)
 
         # these are Variables holding torch.FloatTensors, first grab the data, then convert to numpy
-        res_a, reliability_a = dcn.forward_single_image_tensor(rgb_a_tensor)
-        res_b, reliability_b = dcn.forward_single_image_tensor(rgb_b_tensor)
+        res_a, reliability_a, repeatability_a = dcn.forward_single_image_tensor(rgb_a_tensor)
+        res_b, reliability_b, repeatability_b = dcn.forward_single_image_tensor(rgb_b_tensor)
         res_a = res_a.data.cpu().numpy()
         res_b = res_b.data.cpu().numpy()
 
@@ -948,8 +948,8 @@ class DenseCorrespondenceEvaluation(object):
         rgb_b_tensor = dataset.rgb_image_to_tensor(rgb_b)
 
         # these are Variables holding torch.FloatTensors, first grab the data, then convert to numpy
-        res_a, reliability_a = dcn.forward_single_image_tensor(rgb_a_tensor)
-        res_b, reliability_b = dcn.forward_single_image_tensor(rgb_b_tensor)
+        res_a, reliability_a, repeatability_a = dcn.forward_single_image_tensor(rgb_a_tensor)
+        res_b, reliability_b, repeatability_b = dcn.forward_single_image_tensor(rgb_b_tensor)
         res_a = res_a.data.cpu().numpy()
         res_b = res_b.data.cpu().numpy()
 
@@ -1253,7 +1253,8 @@ class DenseCorrespondenceEvaluation(object):
     @staticmethod
     def single_same_scene_image_pair_qualitative_analysis(dcn, dataset, scene_name, img_a_idx, img_b_idx,
                                                           num_matches=10, output_is_normalized=True,
-                                                          reliability_stats=None):
+                                                          reliability_stats=None,
+                                                          repeatability_stats=None):
         """
         Wrapper for single_image_pair_qualitative_analysis, when images are from same scene.
 
@@ -1276,7 +1277,8 @@ class DenseCorrespondenceEvaluation(object):
 
         return DenseCorrespondenceEvaluation.single_image_pair_qualitative_analysis(dcn, dataset, rgb_a, rgb_b, mask_a,
                                                                                     mask_b, num_matches, output_is_normalized=output_is_normalized,
-                                                                                    reliability_stats=reliability_stats)
+                                                                                    reliability_stats=reliability_stats,
+                                                                                    repeatability_stats=repeatability_stats)
 
     @staticmethod
     def single_cross_scene_image_pair_qualitative_analysis(dcn, dataset, scene_name_a,
@@ -1352,8 +1354,8 @@ class DenseCorrespondenceEvaluation(object):
         rgb_b_tensor = dataset.rgb_image_to_tensor(rgb_b)
 
         # these are Variables holding torch.FloatTensors, first grab the data, then convert to numpy
-        res_a, reliability_a = dcn.forward_single_image_tensor(rgb_a_tensor)
-        res_b, reliability_b = dcn.forward_single_image_tensor(rgb_b_tensor)
+        res_a, reliability_a, repeatability_a = dcn.forward_single_image_tensor(rgb_a_tensor)
+        res_b, reliability_b, repeatability_b = dcn.forward_single_image_tensor(rgb_b_tensor)
         res_a = res_a.data.cpu().numpy()
         res_b = res_b.data.cpu().numpy()
 
@@ -1398,7 +1400,7 @@ class DenseCorrespondenceEvaluation(object):
     @staticmethod
     def single_image_pair_qualitative_analysis(
             dcn, dataset, rgb_a, rgb_b, mask_a, mask_b, num_matches,
-            output_is_normalized=True, reliability_stats=None):
+            output_is_normalized=True, reliability_stats=None, repeatability_stats=None):
         """
         Computes qualtitative assessment of DCN performance for a pair of
         images
@@ -1426,8 +1428,8 @@ class DenseCorrespondenceEvaluation(object):
         rgb_b_tensor = dataset.rgb_image_to_tensor(rgb_b)
 
         # these are Variables holding torch.FloatTensors, first grab the data, then convert to numpy
-        res_a, reliability_a = dcn.forward_single_image_tensor(rgb_a_tensor)
-        res_b, reliability_b = dcn.forward_single_image_tensor(rgb_b_tensor)
+        res_a, reliability_a, repeatability_a = dcn.forward_single_image_tensor(rgb_a_tensor)
+        res_b, reliability_b, repeatability_b = dcn.forward_single_image_tensor(rgb_b_tensor)
         res_a = res_a.data.cpu().numpy()
         res_b = res_b.data.cpu().numpy()
 
@@ -1484,16 +1486,22 @@ class DenseCorrespondenceEvaluation(object):
         if reliability_a is not None and reliability_b is not None:
             reliability_a = reliability_a.data.cpu().numpy()
             reliability_b = reliability_b.data.cpu().numpy()
-
             if reliability_stats:
                 reliability_stats.add_from_mask(reliability_a, mask_a)
                 reliability_stats.add_from_mask(reliability_b, mask_b)
-
             reliability_a, reliability_b = DenseCorrespondenceEvaluation.plot_reliability_maps(
                 reliability_a, reliability_b)
             reliability_maps = ReliabilityMap(reliability_a, reliability_b)
         else:
             reliability_maps = None
+
+        if repeatability_a is not None and repeatability_b is not None:
+            repeatability_a = repeatability_a.data.cpu().numpy()
+            repeatability_b = repeatability_b.data.cpu().numpy()
+            if repeatability_stats:
+                repeatability_stats.add_from_mask(repeatability_a, mask_a)
+                repeatability_stats.add_from_mask(repeatability_b, mask_b)
+
         return ImagePairQualitativeResult(correspondence_image_pair, decriptors_images, reliability_maps)
 
     @staticmethod
@@ -1540,8 +1548,8 @@ class DenseCorrespondenceEvaluation(object):
             rgb_b_tensor = dataset.rgb_image_to_tensor(rgb_b)
 
             # these are Variables holding torch.FloatTensors, first grab the data, then convert to numpy
-            res_a, reliability_a = dcn.forward_single_image_tensor(rgb_a_tensor)
-            res_b, reliability_b = dcn.forward_single_image_tensor(rgb_b_tensor)
+            res_a, reliability_a, repeatability_a = dcn.forward_single_image_tensor(rgb_a_tensor)
+            res_b, reliability_b, repeatability_b = dcn.forward_single_image_tensor(rgb_b_tensor)
             res_a = res_a.data.cpu().numpy()
             res_b = res_b.data.cpu().numpy()
 
@@ -2060,7 +2068,7 @@ class DenseCorrespondenceEvaluation(object):
     @staticmethod
     def evaluate_network_qualitative_without_plotting(
             dcn, dataset, num_image_pairs=5, randomize=False, scene_type=None,
-            output_is_normalized=True, reliability_stats=None):
+            output_is_normalized=True, reliability_stats=None, repeatability_stats=None):
         dcn.eval()
         # Train Data
         if randomize:
@@ -2094,7 +2102,8 @@ class DenseCorrespondenceEvaluation(object):
                                                                                                   img_pair[0],
                                                                                                   img_pair[1],
                                                                                                   output_is_normalized=output_is_normalized,
-                                                                                                  reliability_stats=reliability_stats)
+                                                                                                  reliability_stats=reliability_stats,
+                                                                                                  repeatability_stats=repeatability_stats)
             train_results.append((res, comment))
 
         train_evals = DenseCorrespondenceEvaluation.combine_qualitative_evaluations(train_results)
@@ -2131,7 +2140,9 @@ class DenseCorrespondenceEvaluation(object):
                                                                                                   scene_name,
                                                                                                   img_pair[0],
                                                                                                   img_pair[1],
-                                                                                                  output_is_normalized=output_is_normalized)
+                                                                                                  output_is_normalized=output_is_normalized,
+                                                                                                  reliability_stats=reliability_stats,
+                                                                                                  repeatability_stats=repeatability_stats)
             test_results.append((res, comment))
 
         test_evals = DenseCorrespondenceEvaluation.combine_qualitative_evaluations(test_results)
@@ -2254,11 +2265,11 @@ class DenseCorrespondenceEvaluation(object):
                 non_matches_b = Variable(non_matches_b.cuda().squeeze(0), requires_grad=False)
 
             # run both images through the network
-            image_a_pred, reliability_a = dcn.forward(img_a)
-            image_a_pred, reliability_a = dcn.process_network_output(image_a_pred, reliability_a, batch_size)
+            output_a = dcn.forward(img_a)
+            image_a_pred, reliability_a, repeatability_a = dcn.process_network_output(output_a, batch_size)
 
-            image_b_pred, reliability_b = dcn.forward(img_b)
-            image_b_pred, reliability_b = dcn.process_network_output(image_b_pred, reliability_b, batch_size)
+            output_b = dcn.forward(img_b)
+            image_b_pred, reliability_b, repeatability_b = dcn.process_network_output(output_b, batch_size)
 
             # get loss
             if data_type == "matches":
@@ -2400,7 +2411,7 @@ class DenseCorrespondenceEvaluation(object):
         for i in xrange(0, num_images):
             rgb, depth, mask, _ = dataset.get_random_rgbd_mask_pose()
             img_tensor = dataset.rgb_image_to_tensor(rgb)
-            res, reliability = dcn.forward_single_image_tensor(img_tensor)  # [H, W, D]
+            res, reliability, repeatability = dcn.forward_single_image_tensor(img_tensor)  # [H, W, D]
 
             mask_tensor = to_tensor(mask).cuda()
             entire_image_stats, mask_image_stats = compute_descriptor_statistics(res, mask_tensor)
@@ -2654,7 +2665,7 @@ class DenseCorrespondenceEvaluation(object):
             # plt.show()
 
             img_tensor = dataset.rgb_image_to_tensor(rgb)
-            res, reliability = dcn.forward_single_image_tensor(img_tensor)  # [H, W, D]
+            res, reliability, repeatability = dcn.forward_single_image_tensor(img_tensor)  # [H, W, D]
             res = res.data.cpu().numpy()
 
             descriptors_object = np.zeros((len(object_u_samples), d))

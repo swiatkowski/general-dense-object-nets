@@ -20,6 +20,8 @@ import tensorboard_logger
 
 # dense correspondence
 import dense_correspondence_manipulation.utils.utils as utils
+from dense_correspondence.loss_functions.repeatability_loss import RepeatabilityLoss
+
 utils.add_dense_correspondence_to_python_path()
 import pytorch_segmentation_detection.models.fcn as fcns
 import pytorch_segmentation_detection.models.resnet_dilated as resnet_dilated
@@ -42,7 +44,7 @@ from dense_correspondence.evaluation.evaluation import DenseCorrespondenceEvalua
 from dense_correspondence.evaluation.evaluation import DenseCorrespondenceEvaluationPlotter as DCEP
 from dense_correspondence.evaluation.plotting import normalize_descriptor
 from dense_correspondence.logging.dispatcher import dispatch_logger
-from dense_correspondence.logging.reliability_statistics import ReliabilityStatistics
+from dense_correspondence.logging.statistics import HeatmapStatistics
 
 from dense_correspondence.loss_functions.probabilistic_loss import ProbabilisticLoss
 
@@ -359,11 +361,13 @@ class DenseCorrespondenceTraining(object):
                 self.logger.log('learning rate', x=iteration, y=self.get_learning_rate(optimizer))
 
                 # run both images through the network
-                image_a_pred_, reliability_a_ = dcn.forward(img_a)
-                image_a_pred, reliability_a = dcn.process_network_output(image_a_pred_, reliability_a_, batch_size)
+                output_a = dcn.forward(img_a)
+                output_a = dcn.process_network_output(output_a, batch_size)
+                image_a_pred, reliability_a, repeatability_a = output_a
 
-                image_b_pred_, reliability_b_ = dcn.forward(img_b)
-                image_b_pred, reliability_b = dcn.process_network_output(image_b_pred_, reliability_b_, batch_size)
+                output_b = dcn.forward(img_b)
+                output_b = dcn.process_network_output(output_b, batch_size)
+                image_b_pred, reliability_b, repeatability_b = output_b
 
                 # get loss
                 loss, match_loss, masked_non_match_loss, background_non_match_loss, blind_non_match_loss = 0, 0, 0, 0, 0
@@ -388,35 +392,41 @@ class DenseCorrespondenceTraining(object):
                 elif self._config['loss_function']['name'] == 'aploss':
                     if reliability_a is None and reliability_b is None:
                         loss = loss_function.get_loss(image_a_pred, image_b_pred, dataset_item)
-                        self.logger.log('loss', x=iteration, y=loss.item())
+                        self.logger.log('ap_loss', x=iteration, y=loss.item())
                     else:
-                        ap_loss, ap_loss_with_reliability = loss_function.get_loss_with_reliability(
-                            image_a_pred, image_b_pred,
-                            dataset_item,
-                            reliability_a, reliability_b)
-                        loss = ap_loss_with_reliability
+                        loss, ap_loss, ap_score_mean, ap_score_reliability_mean, reliability_penalty_mean = \
+                            loss_function.get_loss_with_reliability(
+                                image_a_pred, image_b_pred,
+                                dataset_item,
+                                reliability_a, reliability_b)
+                        self.logger.log('ap_loss_reliability', x=iteration, y=loss.item())
                         self.logger.log('ap_loss', x=iteration, y=ap_loss.item())
-                        self.logger.log('loss', x=iteration, y=loss.item())
+                        self.logger.log('ap_score_mean', x=iteration, y=ap_score_mean.item())
+                        self.logger.log('ap_score_reliability_mean', x=iteration, y=ap_score_reliability_mean.item())
+                        self.logger.log('reliability_penalty_mean', x=iteration, y=reliability_penalty_mean.item())
+
+                        # Add loss from repeatability
+                    if self._config['dense_correspondence_network']['head']['class'] and \
+                        self._config['dense_correspondence_network']['head']['repeatability']:
+                        repeatability_loss, cosine_loss, peaky_loss = RepeatabilityLoss.get_loss(
+                            repeatability_a, repeatability_b, dataset_item
+                        )
+                        self.logger.log('repeatability_loss', x=iteration,
+                                        y=repeatability_loss.item())
+                        self.logger.log('cosine_loss', x=iteration, y=cosine_loss.item())
+                        self.logger.log('peaky_loss', x=iteration, y=peaky_loss.item())
+                        loss += repeatability_loss
+
+                    self.logger.log('loss', x=iteration, y=loss.item())
 
                 elif self._config['loss_function']['name'] == 'probabilistic_loss':
-                    ap_loss_return = loss_function.get_loss(match_type,
+                    loss = loss_function.get_loss(match_type,
                                                     image_a_pred, image_b_pred,
                                                     reliability_a, reliability_b,
                                                     matches_a, matches_b,
                                                     masked_non_matches_a, masked_non_matches_b,
                                                     background_non_matches_a, background_non_matches_b,
                                                     blind_non_matches_a, blind_non_matches_b)
-                    loss = ap_loss_return.loss
-                    if ap_loss_return.loss_with_reliability:
-                        loss = ap_loss_return.loss_with_reliability
-                        self.logger.log('loss without reliability',
-                                        x=iteration, y=ap_loss_return.loss.item())
-                        self.logger.log('max reliability for matches',
-                                        x=iteration, y=ap_loss_return.max_reliability.item())
-                        self.logger.log('min reliability for matches',
-                                        x=iteration, y=ap_loss_return.min_reliability.item())
-                        self.logger.log('mean reliability for matches',
-                                        x=iteration, y=ap_loss_return.mean_reliability.item())
                     self.logger.log('loss', x=iteration, y=loss.item())
                 else:
                     raise NotImplementedError('loss function')
@@ -488,32 +498,52 @@ class DenseCorrespondenceTraining(object):
                 update_plots(loss, match_loss, masked_non_match_loss, background_non_match_loss, blind_non_match_loss)
 
                 if reliability_a is not None and reliability_b is not None:
-                    reliability_stats = ReliabilityStatistics(
+                    reliability_stats = HeatmapStatistics(
                         'reliability_train_matches',
                         create_histogram=self.is_qualitative_evaluation_iteration(iteration))
                     reliability_stats.add_from_matches(reliability_a, matches_a)
                     reliability_stats.add_from_matches(reliability_b, matches_b)
                     reliability_stats.log(self.logger, iteration)
 
+                if repeatability_a is not None and repeatability_b is not None:
+                    repeatability_stats = HeatmapStatistics(
+                        'repeatability_train_matches',
+                        create_histogram=self.is_qualitative_evaluation_iteration(iteration))
+                    repeatability_stats.add_from_matches(repeatability_a, matches_a)
+                    repeatability_stats.add_from_matches(repeatability_b, matches_b)
+                    repeatability_stats.log(self.logger, iteration)
+
                 if loss_current_iteration % save_rate == 0:
                     print("Saving model at iter: ", loss_current_iteration)
                     self.save_network(dcn, optimizer, loss_current_iteration, logging_dict=self._logging_dict, last_only=True)
 
                 if self.is_qualitative_evaluation_iteration(iteration):
-                    reliability_stats = ReliabilityStatistics('reliability_eval_mask',
+                    reliability_stats = None
+                    repeatability_stats = None
+                    if reliability_a is not None and reliability_b is not None:
+                        reliability_stats = HeatmapStatistics('reliability_eval_mask',
                                                               create_histogram=True)
+                    if repeatability_a is not None and repeatability_b is not None:
+                        repeatability_stats = HeatmapStatistics('repeatability_eval_mask',
+                                                              create_histogram=True)
+
                     normalization = self._config['dense_correspondence_network']['normalize']
                     output_is_normalized = normalization is not None
                     evaluations = DCE.evaluate_network_qualitative_without_plotting(
                         dcn, dataset=self.dataset, randomize=True,
                         output_is_normalized=output_is_normalized,
-                        reliability_stats=reliability_stats)
+                        reliability_stats=reliability_stats,
+                        repeatability_stats=repeatability_stats
+                    )
                     for e, _ in evaluations['train_evals']:
                         self.logger.log('Train eval - iter {}'.format(iteration), e * 255.0, type='image')
                     for e, _ in evaluations['test_evals']:
                         self.logger.log('Test eval - iter {}'.format(iteration), e * 255.0, type='image')
-                    if reliability_a is not None and reliability_b is not None:
+
+                    if reliability_stats:
                         reliability_stats.log(self.logger, iteration)
+                    if repeatability_stats:
+                        repeatability_stats.log(self.logger, iteration)
 
                 if (iteration + 1) % self._config["logging"]["quantitative_evaluation_logging_rate"] == 0:
                     self.evaluate_quantitative(iteration=iteration, dcn=dcn)
