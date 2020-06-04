@@ -594,14 +594,11 @@ class DenseCorrespondenceTraining(object):
 
     def evaluate_quantitative(self, iteration, dcn=None):
         DCE = DenseCorrespondenceEvaluation
-        num_image_pairs = self._config['evaluation']['num_image_pairs']
-        cross_scene = self._config['evaluation']['cross_scene']
-        compute_descriptor_statistics = self._config['evaluation']['compute_descriptor_statistics']
         DCE.run_evaluation_on_network(
             self._logging_dir,
-            num_image_pairs=num_image_pairs,
-            cross_scene=True,
-            compute_descriptor_statistics=True,
+            num_image_pairs=self._config['evaluation']['num_image_pairs'],
+            cross_scene=self._config['evaluation']['cross_scene'],
+            compute_descriptor_statistics=self._config['evaluation']['compute_descriptor_statistics'],
             iteration=iteration,
             dataset=self.dataset,
             dcn=dcn

@@ -769,7 +769,7 @@ class DenseCorrespondenceEvaluation(object):
                     continue
 
                 diff_rgb_a_tensor = dataset.rgb_image_to_tensor(diff_rgb_a)
-                diff_res_a, reliability_a, repeatability_a = dcn.forward_single_image_tensor(diff_rgb_a_tensor)
+                diff_res_a, diff_reliability_a, diff_repeatability_a = dcn.forward_single_image_tensor(diff_rgb_a_tensor)
                 diff_res_a = diff_res_a.data.cpu().numpy()
 
                 diff_uv_a = (diff_uv_a_vec[0][0], diff_uv_a_vec[1][0])
@@ -959,13 +959,17 @@ class DenseCorrespondenceEvaluation(object):
         res_a = res_a.data.cpu().numpy()
         res_b = res_b.data.cpu().numpy()
 
+        print('mask_a.shape', mask_a.shape)
+        print('mask_a', mask_a)
+
         if camera_intrinsics_matrix is None:
             camera_intrinsics = dataset.get_camera_intrinsics(scene_name)
             camera_intrinsics_matrix = camera_intrinsics.K
 
         # find correspondences
-        (uv_a_vec, uv_b_vec) = correspondence_finder.batch_find_pixel_correspondences(depth_a, pose_a, depth_b, pose_b,
-                                                                                      device='CPU', img_a_mask=mask_a)
+        (uv_a_vec, uv_b_vec) = correspondence_finder.batch_find_pixel_correspondences(
+            depth_a, pose_a, depth_b, pose_b, device='CPU',
+            img_a_mask=mask_a, reliability_a=reliability_a, repeatability_a=repeatability_a)
 
         if uv_a_vec is None:
             print "no matches found, returning"
@@ -975,9 +979,20 @@ class DenseCorrespondenceEvaluation(object):
         # will eventually combine them all with concat
         dataframe_list = []
 
-        total_num_matches = len(uv_a_vec[0])
-        num_matches = min(num_matches, total_num_matches)
-        match_list = random.sample(range(0, total_num_matches), num_matches)
+        if reliability_a is None and repeatability_a is None:
+            total_num_matches = len(uv_a_vec[0])
+            num_matches = min(num_matches, total_num_matches)
+            match_list = random.sample(range(0, total_num_matches), num_matches)
+        else:
+            total_num_matches = len(uv_a_vec[0])
+            # For simplicity take all found matches
+            # TODO: sample num_matches out of total_num_matches according to their ranks from
+            #  reliability and repeatability.
+            assert total_num_matches <= num_matches
+            match_list = range(total_num_matches)
+            # print '(uv_a_vec, uv_b_vec)'
+            # print(uv_a_vec[0].shape, uv_a_vec[1].shape, uv_b_vec[0].shape, uv_b_vec[1].shape)
+            # print(uv_a_vec, uv_b_vec)
 
         if debug:
             match_list = [50]
@@ -2512,7 +2527,7 @@ class DenseCorrespondenceEvaluation(object):
         # compute dataset statistics
         if compute_descriptor_statistics:
             logging.info("Computing descriptor statistics on dataset")
-            DCE.compute_descriptor_statistics_on_dataset(dcn, dataset, num_images=100, save_to_file=True)
+            # DCE.compute_descriptor_statistics_on_dataset(dcn, dataset, num_images=100, save_to_file=True)
 
         # evaluate on training data and on test data
         logging.info("Evaluating network on train data")
