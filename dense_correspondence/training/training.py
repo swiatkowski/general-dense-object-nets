@@ -613,8 +613,9 @@ class DenseCorrespondenceTraining(object):
         DCEP.log_metrics_from_dataframe(self.logger, path_to_csv, title_prefix='test', iteration=iteration)
 
         # eval
-        path_to_csv = os.path.join(self._logging_dir, "analysis/cross_scene/data.csv")
-        DCEP.log_metrics_from_dataframe(self.logger, path_to_csv, title_prefix='eval', iteration=iteration)
+        if self._config['evaluation']['cross_scene']:
+            path_to_csv = os.path.join(self._logging_dir, "analysis/cross_scene/data.csv")
+            DCEP.log_metrics_from_dataframe(self.logger, path_to_csv, title_prefix='eval', iteration=iteration)
 
     def setup_logging_dir(self):
         """
