@@ -988,9 +988,6 @@ class DenseCorrespondenceEvaluation(object):
             #  reliability and repeatability.
             assert total_num_matches <= num_matches
             match_list = range(total_num_matches)
-            # print '(uv_a_vec, uv_b_vec)'
-            # print(uv_a_vec[0].shape, uv_a_vec[1].shape, uv_b_vec[0].shape, uv_b_vec[1].shape)
-            # print(uv_a_vec, uv_b_vec)
 
         if debug:
             match_list = [50]
@@ -2104,6 +2101,7 @@ class DenseCorrespondenceEvaluation(object):
             output_is_normalized=True, reliability_stats=None, repeatability_stats=None):
         dcn.eval()
         # Train Data
+        dataset.set_train_mode()
         if randomize:
             scene_names, img_pairs = DenseCorrespondenceEvaluation.get_random_scenes_and_image_pairs(dataset)
         else:
@@ -2535,7 +2533,7 @@ class DenseCorrespondenceEvaluation(object):
         # compute dataset statistics
         if compute_descriptor_statistics:
             logging.info("Computing descriptor statistics on dataset")
-            # DCE.compute_descriptor_statistics_on_dataset(dcn, dataset, num_images=100, save_to_file=True)
+            DCE.compute_descriptor_statistics_on_dataset(dcn, dataset, num_images=100, save_to_file=True)
 
         # evaluate on training data and on test data
         logging.info("Evaluating network on train data")
