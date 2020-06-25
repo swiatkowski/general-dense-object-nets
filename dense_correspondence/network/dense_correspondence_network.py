@@ -21,7 +21,7 @@ NetworkOutput = namedtuple('NetworkOutput', ['descriptors', 'reliability', 'repe
 class DenseCorrespondenceNetwork(nn.Module):
     IMAGE_TO_TENSOR = valid_transform = transforms.Compose([transforms.ToTensor(), ])
 
-    def __init__(self, fcn, descriptor_dimension, image_width=640, image_height=480, normalize='unit_ball'):
+    def __init__(self, fcn, descriptor_dimension, image_width=640, image_height=480, normalize='unit_ball', extra_dimensions=None):
         """
         :param fcn:
         :type fcn:
@@ -41,6 +41,18 @@ class DenseCorrespondenceNetwork(nn.Module):
         self._descriptor_dimension = descriptor_dimension
         self._image_width = image_width
         self._image_height = image_height
+
+        # Bigger model feature
+        self.extra_layers = []
+        if extra_dimensions:
+            in_dims = [512] + extra_dimensions
+            out_dims = extra_dimensions + [descriptor_dimension]
+            for in_dim, out_dim in zip(in_dims, out_dims):
+                self.extra_layers.append(nn.Conv2d(in_dim, out_dim, kernel_size=3, stride=1, padding=1))
+                # self.extra_layers.append(nn.Conv2d(in_dim, out_dim, kernel_size=(1, 1), stride=(1, 1)))
+                self.extra_layers.append(nn.BatchNorm2d(out_dim))
+                self.extra_layers.append(nn.ReLU())
+            self._fcn.fcn.resnet34_8s.fc = nn.Sequential(*self.extra_layers[:-2])
 
         # this defaults to the identity transform
         self._image_mean = np.zeros(3)
@@ -424,10 +436,12 @@ class DenseCorrespondenceNetwork(nn.Module):
         else:
             normalize = False
 
+        print config['extra_dimensions']
         dcn = DenseCorrespondenceNetwork(fcn, config['descriptor_dimension'],
                                          image_width=config['image_width'],
                                          image_height=config['image_height'],
-                                         normalize=normalize)
+                                         normalize=normalize,
+                                         extra_dimensions=config['extra_dimensions'])
 
         if load_stored_params:
             assert model_param_file is not None
