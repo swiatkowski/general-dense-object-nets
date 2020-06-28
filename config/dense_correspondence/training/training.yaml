@@ -36,6 +36,7 @@ training:
 
 dense_correspondence_network:
   descriptor_dimension: 3
+  extra_dimensions: [256, 128] # number of conv kernels to add between end of backbone and descriptors. Optional
   image_width: 640
   image_height: 480
   normalize: 'unit_ball' # chocie: 'unit_ball', 'unit_sphere', None
