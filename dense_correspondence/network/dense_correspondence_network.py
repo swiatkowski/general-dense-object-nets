@@ -49,10 +49,9 @@ class DenseCorrespondenceNetwork(nn.Module):
             out_dims = extra_dimensions + [descriptor_dimension]
             for in_dim, out_dim in zip(in_dims, out_dims):
                 self.extra_layers.append(nn.Conv2d(in_dim, out_dim, kernel_size=3, stride=1, padding=1))
-                # self.extra_layers.append(nn.Conv2d(in_dim, out_dim, kernel_size=(1, 1), stride=(1, 1)))
                 self.extra_layers.append(nn.BatchNorm2d(out_dim))
                 self.extra_layers.append(nn.ReLU())
-            self._fcn.fcn.resnet34_8s.fc = nn.Sequential(*self.extra_layers[:-2])
+            self._fcn.fcn[-1].fc = nn.Sequential(*self.extra_layers[:-2])
 
         # this defaults to the identity transform
         self._image_mean = np.zeros(3)
@@ -436,7 +435,6 @@ class DenseCorrespondenceNetwork(nn.Module):
         else:
             normalize = False
 
-        print config['extra_dimensions']
         dcn = DenseCorrespondenceNetwork(fcn, config['descriptor_dimension'],
                                          image_width=config['image_width'],
                                          image_height=config['image_height'],
