@@ -125,6 +125,42 @@ def random_sample_from_masked_image_torch(img_mask, num_samples):
     uv_vec = utils.flattened_pixel_locations_to_u_v(uv_vec_flattened, image_width)
     return uv_vec
 
+def ranked_sample_from_masked_image_torch(img_mask, reliability, repeatability, num_samples):
+    assert reliability is not None or repeatability is not None
+    _, image_width = img_mask.shape
+    # Get indices of pixels from a mask of a flatten image.
+    img_mask = img_mask.flatten()
+    img_mask_indices = img_mask.nonzero().squeeze()
+    if len(img_mask_indices) == 0:
+        return None, None
+
+    # Get values from a masked pixels.
+    if reliability is not None:
+        reliability = reliability.squeeze().flatten()
+        reliability_masked = reliability[img_mask_indices]
+    if repeatability is not None:
+        repeatability = repeatability.squeeze().flatten()
+        repeatability_masked = repeatability[img_mask_indices]
+        # This line works only in Pytorch >= 1.2
+        # repeatability_masked = repeatability.masked_select(img_mask.bool())
+
+    if reliability is not None and repeatability is not None:
+        ranks = reliability_masked * repeatability_masked
+    elif reliability is not None:
+        ranks = reliability_masked
+    elif repeatability is not None:
+        ranks = repeatability_masked
+
+    # Select indices of top num_samples pixels.
+    if ranks.size()[0] > num_samples:
+        _, top_mask_indices = ranks.topk(num_samples)
+        uv_vec_flattened = img_mask_indices[top_mask_indices]
+    else:
+        uv_vec_flattened = img_mask_indices
+
+    uv_vec = utils.flattened_pixel_locations_to_u_v(uv_vec_flattened, image_width)
+    return uv_vec
+
 def pinhole_projection_image_to_world(uv, z, K):
     """
     Takes a (u,v) pixel location to it's 3D location in camera frame.
@@ -412,7 +448,8 @@ def create_non_correspondences(uv_b_matches, img_b_shape, num_non_matches_per_ma
 # Optionally, uv_a specifies the pixels in img_a for which to find matches
 # If uv_a is not set, then random correspondences are attempted to be found
 def batch_find_pixel_correspondences(img_a_depth, img_a_pose, img_b_depth, img_b_pose, 
-                                        uv_a=None, num_attempts=20, device='CPU', img_a_mask=None, K=None):
+                                        uv_a=None, num_attempts=20, device='CPU', img_a_mask=None,
+                                     reliability_a=None, repeatability_a=None, K=None):
     """
     Computes pixel correspondences in batch
 
@@ -473,11 +510,18 @@ def batch_find_pixel_correspondences(img_a_depth, img_a_pose, img_b_depth, img_b
         uv_a_vec_flattened = uv_a_vec[1]*image_width+uv_a_vec[0]
     else:
         img_a_mask = torch.from_numpy(img_a_mask).type(dtype_float)  
-        
+
+        # Option C: Take points based on the values of reliability_a and repeatability_a.
+        if reliability_a is not None or repeatability_a is not None:
+            uv_a_vec = ranked_sample_from_masked_image_torch(
+                img_a_mask, reliability_a, repeatability_a, num_samples=num_attempts)
+
         # Option A: This next line samples from img mask
-        uv_a_vec = random_sample_from_masked_image_torch(img_a_mask, num_samples=num_attempts)
+        else:
+            uv_a_vec = random_sample_from_masked_image_torch(img_a_mask, num_samples=num_attempts)
+
         if uv_a_vec[0] is None:
-            return (None, None)
+            return None, None
         
         # Option B: These 4 lines grab ALL from img mask
         # mask_a = img_a_mask.squeeze(0)

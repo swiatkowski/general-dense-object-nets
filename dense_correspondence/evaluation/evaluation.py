@@ -29,7 +29,8 @@ import dense_correspondence_manipulation.utils.visualization as vis_utils
 
 import dense_correspondence.evaluation.plotting as dc_plotting
 
-from dense_correspondence.correspondence_tools.correspondence_finder import random_sample_from_masked_image
+from dense_correspondence.correspondence_tools.correspondence_finder import \
+    random_sample_from_masked_image, ranked_sample_from_masked_image_torch
 
 from dense_correspondence.evaluation.utils import PandaDataFrameWrapper
 
@@ -769,7 +770,7 @@ class DenseCorrespondenceEvaluation(object):
                     continue
 
                 diff_rgb_a_tensor = dataset.rgb_image_to_tensor(diff_rgb_a)
-                diff_res_a, reliability_a, repeatability_a = dcn.forward_single_image_tensor(diff_rgb_a_tensor)
+                diff_res_a, diff_reliability_a, diff_repeatability_a = dcn.forward_single_image_tensor(diff_rgb_a_tensor)
                 diff_res_a = diff_res_a.data.cpu().numpy()
 
                 diff_uv_a = (diff_uv_a_vec[0][0], diff_uv_a_vec[1][0])
@@ -964,8 +965,9 @@ class DenseCorrespondenceEvaluation(object):
             camera_intrinsics_matrix = camera_intrinsics.K
 
         # find correspondences
-        (uv_a_vec, uv_b_vec) = correspondence_finder.batch_find_pixel_correspondences(depth_a, pose_a, depth_b, pose_b,
-                                                                                      device='CPU', img_a_mask=mask_a)
+        (uv_a_vec, uv_b_vec) = correspondence_finder.batch_find_pixel_correspondences(
+            depth_a, pose_a, depth_b, pose_b, device='CPU',
+            img_a_mask=mask_a, reliability_a=reliability_a, repeatability_a=repeatability_a)
 
         if uv_a_vec is None:
             print "no matches found, returning"
@@ -975,9 +977,17 @@ class DenseCorrespondenceEvaluation(object):
         # will eventually combine them all with concat
         dataframe_list = []
 
-        total_num_matches = len(uv_a_vec[0])
-        num_matches = min(num_matches, total_num_matches)
-        match_list = random.sample(range(0, total_num_matches), num_matches)
+        if reliability_a is None and repeatability_a is None:
+            total_num_matches = len(uv_a_vec[0])
+            num_matches = min(num_matches, total_num_matches)
+            match_list = random.sample(range(0, total_num_matches), num_matches)
+        else:
+            total_num_matches = len(uv_a_vec[0])
+            # For simplicity take all found matches
+            # TODO: sample num_matches out of total_num_matches according to their ranks from
+            #  reliability and repeatability.
+            assert total_num_matches <= num_matches
+            match_list = range(total_num_matches)
 
         if debug:
             match_list = [50]
@@ -1439,13 +1449,25 @@ class DenseCorrespondenceEvaluation(object):
         res_a = res_a.data.cpu().numpy()
         res_b = res_b.data.cpu().numpy()
 
-        # sample points on img_a. Compute best matches on img_b
-        # note that this is in (x,y) format
-        # TODO: if this mask is empty, this function will not be happy
-        # de-prioritizing since this is only for qualitative evaluation plots
-        sampled_idx_list, num_matches = random_sample_from_masked_image(mask_a, num_matches)
-        if len(sampled_idx_list) == 0:
-            return None
+        if reliability_a is not None or repeatability_a is not None:
+            mask_a_tensor = torch.from_numpy(mask_a)
+            uv_a_vec = ranked_sample_from_masked_image_torch(
+                mask_a_tensor, reliability_a, repeatability_a, num_matches)
+            if uv_a_vec[0] is None:
+                return None
+            uv_a_vec_lists = (uv_a_vec[0].tolist(), uv_a_vec[1].tolist())
+            sampled_idx_iter = zip(*uv_a_vec_lists)
+        else:
+            # sample points on img_a. Compute best matches on img_b
+            # note that this is in (x,y) format
+            # TODO: if this mask is empty, this function will not be happy
+            # de-prioritizing since this is only for qualitative evaluation plots
+            sampled_idx_list, num_matches = random_sample_from_masked_image(mask_a, num_matches)
+            if len(sampled_idx_list) == 0:
+                return None
+            # convert (x,y) to (u,v) format
+            sampled_idx_iter = ((sampled_idx_list[1][i], sampled_idx_list[0][i])
+                                for i in xrange(num_matches))
 
         # list of cv2.KeyPoint
         kp1 = []
@@ -1463,11 +1485,9 @@ class DenseCorrespondenceEvaluation(object):
             print "Only normalizing pairs of images!"
             descriptor_image_stats = None
 
-        for i in xrange(0, num_matches):
-            # convert to (u,v) format
-            pixel_a = [sampled_idx_list[1][i], sampled_idx_list[0][i]]
-            best_match_uv, best_match_diff, norm_diffs = DenseCorrespondenceNetwork.find_best_match(pixel_a, res_a,
-                                                                                                    res_b)
+        for i, pixel_a in enumerate(sampled_idx_iter):
+            best_match_uv, best_match_diff, norm_diffs = DenseCorrespondenceNetwork.find_best_match(
+                pixel_a, res_a, res_b)
 
             # be careful, OpenCV format is  (u,v) = (right, down)
             kp1.append(cv2.KeyPoint(pixel_a[0], pixel_a[1], diam))
@@ -2081,6 +2101,7 @@ class DenseCorrespondenceEvaluation(object):
             output_is_normalized=True, reliability_stats=None, repeatability_stats=None):
         dcn.eval()
         # Train Data
+        dataset.set_train_mode()
         if randomize:
             scene_names, img_pairs = DenseCorrespondenceEvaluation.get_random_scenes_and_image_pairs(dataset)
         else:
